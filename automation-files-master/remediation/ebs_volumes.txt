@@ -1,0 +1,72 @@
+ebs_volumes remediation:
+
+Copy the role from the output stack and assign that role to the CMK keys.
+Add the Users to the group created by the stack for you with the stack name which you can see in the output stack. It will exclude the
+users from executing the state machine and the access to lambda fucntions.
+
+
+
+In order to encrypt for all the volumes in all the regions, the region parameter shouldn't be there as below.
+If delete "yes" then it will delete the unencrypted volumes
+If you want to use the CMK it should be given in the below format else don't give the keys as input parameter which will encrypt by default master keys.
+
+{
+  "delete": "yes",
+  "key": {
+    "us-east-1": "5f5af7df-dasasa3f-4878-a491-b3767de1d8d0",
+    "ap-northeast-1": "68217d78-c287-42dc-92ec-eacb46041675"
+  }
+}
+
+
+
+If you want to run for the specific regions then the region names should be given in the list as below.
+If delete = "no" then it won't delete any unencrypted volumes.
+
+{
+  "delete": "no",
+  "region": [
+    "us-east-1",
+    "ap-northeast-1"
+  ],
+  "key": {
+    "us-east-1": "5f5acsadasdf-da3f-4878-a491-b3767de1d8d0",
+    "ap-northeast-1": "682szdsadd78-c287-42dc-92ec-eacb46041675"
+  }
+}
+
+
+If you don't want to encrypt the selected volumes or instances then it should be given in the list as below..
+
+
+{
+  "delete": "yes",
+  "region": [
+    "us-east-1",
+    "ap-northeast-1"
+  ],
+  "not_volume" : ["vol-asdf4rsddv","vol-sdexgesderfdd"],
+  "not_instance" : ["i-23sxsdwdzxvdc","i-zxzcxzvdsfdvcc"],
+  "key": {
+    "us-east-1": "5f5asdsa7df-da3f-4878-a491-b3767de1d8d0",
+    "ap-northeast-1": "68217dsdsssds-c287-42dc-92ec-eacb46041675"
+  }
+}
+
+
+for the volumes to use the default keys it should be in the below format.
+
+{
+  "delete": "yes",
+  "region": [
+    "us-east-1",
+    "ap-northeast-1"
+  ],
+  "not_volume" : ["vol-asdf4rsddv","vol-sdexgesderfdd"],
+  "not_instance" : ["i-23sxsdwdzxvdc","i-zxzcxzvdsfdvcc"]
+}
+
+
+
+
+NOTE : "Region" input parameter must be given, if not it will encrypt all the volumes in all the regions.

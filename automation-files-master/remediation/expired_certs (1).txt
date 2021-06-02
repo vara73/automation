@@ -1,0 +1,39 @@
+Security Group Remediation:
+The following Cloud formation template creates a step function which remediates expired certificates which are not in use and imported to ACM or IAM or both based on input parameters
+The state machine execution (or AWS Lambda functions it invokes) the state machine execute a Lambda functions based on input JSON parameters.
+To delete All possible IAM certificates in a current region, leave a blank space in "Region" parameter and “IAMCertificateName” parameter as shown below:
+
+{
+  "Region": "",
+  "CertType": "IAM",
+  "IAMCertificateName": ""
+}
+
+To delete desired IAM certificates in a current region, leave a blank space in "Region" parameter and “IAMCertificateName” parameter as shown below:
+
+{
+  "Region": "",
+  "CertType": "IAM",
+  "IAMCertificateName": "ACJJDFJKSFSJND"
+}
+
+
+To delete All possible ACM certificates in a specific region, give a specific region in "Region" parameter and “IAMCertificateName” parameter as shown below:
+
+{
+  "Region": "us-east-1, us-west-1",
+  "CertType": "ACM",
+  "ACMCertificateArn": ""
+}
+
+To delete all expired certificates in a specific region, give a specific region in "Region" parameter and blank space in “CertType” parameter as shown below:
+
+{
+  "Region": "us-east-1, us-west-1",
+  "CertType": "",
+  "ACMCertificateArn": "",
+  "IAMCertificateName": ""
+
+  
+}
+

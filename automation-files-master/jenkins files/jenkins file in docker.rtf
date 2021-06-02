@@ -1,0 +1,176 @@
+{\rtf1\ansi\ansicpg1252\cocoartf1671\cocoasubrtf500
+{\fonttbl\f0\fswiss\fcharset0 Helvetica;}
+{\colortbl;\red255\green255\blue255;}
+{\*\expandedcolortbl;;}
+\margl1440\margr1440\vieww33400\viewh20500\viewkind0
+\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural\partightenfactor0
+
+\f0\fs24 \cf0 node('data-engineering') \{\
+  docker.withRegistry('https://dockercentral.it.att.com:5100','docker_mac_id') \{\
+    def sparkImage = docker.image('dockercentral.it.att.com:5100/com.att.mac.platform/spark-master:master')\
+    sparkImage.pull()\
+    sparkImage.inside('-u root -v /opt/:/host/opt -v /home/ec2-user/jenkins/workspace/data-engineering/data-engineering-advertisement-brds/sbt/:/host/sbt -e GIT_MECHID_ACCOUNT="m21060" -e GIT_MECHID_PASS="Rand0m!code" -e no_proxy="169.254.169.254,localhost" -e https_proxy="http://proxy.aws.att.com:3128" -e http_proxy="http://proxy.aws.att.com:3128" -e JAVA_OPTS="-Xmx6144m" ')\{\
+      stage('Clone/Pull project from Git Repo') \{\
+        sh '''#!/bin/bash\
+            GIT_MECHID_ACCOUNT="m21060"\
+            GIT_MECHID_PASS="Rand0m!code"\
+            # clone code repo if project dir not found, otherwise perform a git pull\
+            if [ -d adco-viewership ]; then\
+              rm -rf adco-viewership\
+            fi\
+            git clone --branch develop https://$\{GIT_MECHID_ACCOUNT\}:$\{GIT_MECHID_PASS\}@codecloud.web.att.com/scm/st_addco/adco-viewership.git\
+           '''\
+      \}\
+      stage('Build Jars (SBT Build)') \{\
+        sh '''#!/bin/bash\
+        \
+            #building jar for viewership_dim_load\
+            cd adco-viewership/sourcecode/viewership_dim_load/\
+            sbt -Dsbt.global.base=/host/sbt/.sbt -Dsbt.boot.directory=/host/sbt/.sbt -Dsbt.ivy.home=/host/sbt/.ivy2 clean assembly\
+            cp target/scala-2.11/viewership_dim_load-1.0-SNAPSHOT.jar ../../executables/jars/\
+            \
+            \
+            #building jar for dim_mstr_pgm_mtdt_schd_dim\
+            cd ../dim_mstr_pgm_mtdt_schd_dim/\
+            sbt -Dsbt.global.base=/host/sbt/.sbt -Dsbt.boot.directory=/host/sbt/.sbt -Dsbt.ivy.home=/host/sbt/.ivy2 clean assembly\
+            cp target/scala-2.11/Dim_mstr_pgm_mtdt_schd_dim-assembly-0.1.jar ../../executables/jars/\
+            \
+            #building jar for vdo_chnl_dim\
+            cd ../dim_vdo_chnl_dim/\
+            sbt -Dsbt.global.base=/host/sbt/.sbt -Dsbt.boot.directory=/host/sbt/.sbt -Dsbt.ivy.home=/host/sbt/.ivy2 clean assembly\
+            cp target/scala-2.11/Dim_vdo_chnl_dim-assembly-0.1.jar ../../executables/jars/\
+\
+            #cp src/main/scala/resources/vdl_ccnt_spark.conf ../../conf/\
+            \
+            #copying vdo_chnl_dim_old\
+            cd ../dim_vdo_chnl_dim_old/\
+            cp hql/* ../../executables/hql/\
+            cp shell/* ../../executables/shell/\
+\
+            #building jar for umt_channel\
+            cd ../dim_umt_channel/\
+            sbt -Dsbt.global.base=/host/sbt/.sbt -Dsbt.boot.directory=/host/sbt/.sbt -Dsbt.ivy.home=/host/sbt/.ivy2 clean assembly\
+            cp target/scala-2.11/Dim_umt_channel-assembly-0.1.jar ../../executables/jars/\
+            #cp src/main/scala/resources/vdl_ccnt_spark.conf ../../conf/\
+\
+            #building jar for commoncontent\
+            cd ../content-intelligence-common-content/\
+            sbt -Dsbt.global.base=/host/sbt/.sbt -Dsbt.boot.directory=/host/sbt/.sbt -Dsbt.ivy.home=/host/sbt/.ivy2 clean assembly\
+            cp target/scala-2.11/content-intelligence-common-content-1.0-SNAPSHOT.jar ../../executables/jars/\
+            \
+            #copying brd_cust_chnl_fd_titl_brcst_vwrshp_sumr_dtv_live\
+            cd ../brd_cust_chnl_fd_titl_brcst_vwrshp_sumr_dtv_live/\
+            cp conf/* ../../conf/\
+            cp python/* ../../executables/python/\
+            cp shell/* ../../executables/shell/\
+            cp sql/* ../../executables/sql/\
+\
+            #copying brd3 \
+            cd ../brd3/\
+            cp sql/* ../../executables/sql/\
+            \
+            #copying brd1 \
+            cd ../brd1/\
+            cp sql/* ../../executables/sql/\
+\
+            #copying brd1e\
+            cd ../brd1e/\
+            cp sql/* ../../executables/sql/\
+\
+            #copying brd7 \
+            cd ../brd7/\
+            cp sql/* ../../executables/sql/\
+\
+            #copying brd9 \
+            cd ../brd9/\
+            cp sql/* ../../executables/sql/\
+\
+            #copying ccnt \
+            cd ../ccnt/\
+            cp sql/* ../../executables/sql/\
+\
+            #copying brd30 \
+            cd ../brd30/\
+            cp sql/* ../../executables/sql/\
+            \
+            #copying br11 \
+            cd ../brd11/\
+            cp sql/* ../../executables/sql/\
+\
+            #copying brd17 \
+            cd ../brd17/\
+            cp sql/* ../../executables/sql/\
+\
+            #copying brd25 \
+            cd ../brd25/\
+            cp sql/* ../../executables/sql/\
+\
+            #copying brd21 \
+            cd ../brd21/\
+            cp sql/* ../../executables/sql/\
+\
+            #copying brd23 \
+            cd ../brd23/\
+            cp sql/* ../../executables/sql/\
+\
+            #copying brd38 \
+            cd ../brd38/\
+            cp sql/* ../../executables/sql/\
+            \
+            #copying dim_did_Sql\
+            cd ../dims_did_sql/\
+            cp sql/* ../../executables/sql/\
+            \
+            #Copying Create_source_tables scripts to desired location\
+            cd ../create_source_tables/\
+            cp sql/* ../../executables/sql/\
+            cp shell/* ../../executables/shell/\
+            \
+            \
+	   '''\
+      \}\
+      stage('Deploy Project Code to Artifacts S3') \{\
+        sh '''#!/bin/bash\
+            source /host/opt/switch_role.sh 594349222397 us-east-1 data-engineering-slave-role\
+            KMSKEY="--sse aws:kms --sse-kms-key-id arn:aws:kms:us-east-1:594349222397:key/83517f2b-852d-48af-8bb3-6a1cdffbda5a"\
+            aws s3 rm --recursive s3://dv-mac-dev-artifacts-5943-us-east-1/viewership/\
+            aws s3 sync adco-viewership/ s3://dv-mac-dev-artifacts-5943-us-east-1/viewership/ --exclude ".git/*" --exclude "target/streams/*" --exclude "sourcecode/*/target/streams/*" $\{KMSKEY\}\
+           '''\
+      \}\
+      stage('Deploy DAGs/Configs/Utils to Airflow EC2 instance') \{\
+          sh '''#!/bin/bash\
+              source /host/opt/switch_role.sh 594349222397 us-east-1 data-engineering-slave-role\
+              KMSKEY="--sse aws:kms --sse-kms-key-id arn:aws:kms:us-east-1:594349222397:key/83517f2b-852d-48af-8bb3-6a1cdffbda5a"\
+              # copy DAGs to airflow EC2\
+              aws ssm send-command --instance-ids  i-0ef0682a64c819a8e --document-name "AWS-RunShellScript" --comment "Run Shell" --parameters '\{\
+                "commands":[\
+                  "#!/bin/bash",\
+                  "umask 0002",\
+                  "mkdir -p /mnt/efs/airflow/config/viewership",\
+                  "mkdir -p /mnt/efs/airflow/dags/viewership",\
+                  "mkdir -p /mnt/efs/airflow/plugins/utils/viewership",\
+                  "mkdir -p /mnt/efs/airflow/plugins/operators/viewership",\
+                  "mkdir -p /mnt/efs/airflow/plugins/sensors/viewership",\
+                  "cd /mnt/efs/airflow/dags/viewership/ && rm -rf /mnt/efs/airflow/dags/viewership/*",\
+                  "aws s3 cp s3://dv-mac-dev-artifacts-5943-us-east-1/viewership/workflow/airflow/dags/viewership/ . --recursive --sse aws:kms --sse-kms-key-id arn:aws:kms:us-east-1:594349222397:key/83517f2b-852d-48af-8bb3-6a1cdffbda5a",\
+                  "chown -R ec2-user:ec2-user /mnt/efs/airflow/dags/viewership",\
+                  "cd /mnt/efs/airflow/config/viewership/ && rm -rf /mnt/efs/airflow/config/viewership/*",\
+                  "aws s3 cp s3://dv-mac-dev-artifacts-5943-us-east-1/viewership/workflow/airflow/config/viewership/ . --recursive --sse aws:kms --sse-kms-key-id arn:aws:kms:us-east-1:594349222397:key/83517f2b-852d-48af-8bb3-6a1cdffbda5a",\
+                  "chown -R ec2-user:ec2-user /mnt/efs/airflow/config/viewership",\
+                  "cd /mnt/efs/airflow/plugins/utils/viewership/ && rm -rf /mnt/efs/airflow/plugins/utils/viewership/*",\
+                  "aws s3 cp s3://dv-mac-dev-artifacts-5943-us-east-1/viewership/workflow/airflow/plugins/utils/viewership/ . --recursive --sse aws:kms --sse-kms-key-id arn:aws:kms:us-east-1:594349222397:key/83517f2b-852d-48af-8bb3-6a1cdffbda5a",\
+                  "chown -R ec2-user:ec2-user /mnt/efs/airflow/plugins/utils/viewership",\
+                  "cd /mnt/efs/airflow/plugins/operators/viewership/ && rm -rf /mnt/efs/airflow/plugins/operators/viewership/*",\
+                  "aws s3 cp s3://dv-mac-dev-artifacts-5943-us-east-1/viewership/workflow/airflow/plugins/operators/viewership/ . --recursive --sse aws:kms --sse-kms-key-id arn:aws:kms:us-east-1:594349222397:key/83517f2b-852d-48af-8bb3-6a1cdffbda5a",\
+                  "chown -R ec2-user:ec2-user /mnt/efs/airflow/plugins/operators/viewership",\
+                  "cd /mnt/efs/airflow/plugins/sensors/viewership && rm -rf /mnt/efs/airflow/plugins/sensors/viewership/*",\
+                  "aws s3 cp s3://dv-mac-dev-artifacts-5943-us-east-1/viewership/workflow/airflow/plugins/sensors/viewership . --recursive --sse aws:kms --sse-kms-key-id arn:aws:kms:us-east-1:594349222397:key/83517f2b-852d-48af-8bb3-6a1cdffbda5a",\
+                  "chown -R ec2-user:ec2-user /mnt/efs/airflow/plugins/sensors/viewership"\
+\
+                ]\
+              \}' --output text\
+             '''\
+      \}\
+\}\
+\}\
+\}}

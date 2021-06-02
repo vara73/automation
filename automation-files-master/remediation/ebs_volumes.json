@@ -1,0 +1,2001 @@
+{
+    "AWSTemplateFormatVersion": "2010-09-09",
+    "Description": "A Lambda state machine to convert unencrypted EBS volumes to encrypted EBS.",
+    "Resources": {
+       "GroupNotToExecuteEBSEncryption" : {
+            "Type": "AWS::IAM::Group",
+            "Properties": {
+            "Policies": [ 
+                          {
+                             "PolicyName": "InLine_Policy_For_Users_You_Want_To_Restrict_To_Use_EBS_Encryption",
+                             "PolicyDocument": {
+                             "Version": "2012-10-17",
+                             "Statement": [
+                               {
+                                  "Sid": "VisualEditor1",
+                                  "Effect": "Allow",
+                                  "Action": [
+                                      "iam:GetRole",
+                                      "iam:GetPolicyVersion",
+                                      "iam:GetPolicy",
+                                      "iam:ListAttachedRolePolicies",
+                                      "cloudformation:DescribeStackResources",
+                                      "tag:GetResources",
+                                      "iam:ListRolePolicies",
+                                      "iam:GetRolePolicy",
+                                      "cloudformation:DescribeStacks",
+                                      "kms:ListAliases",
+                                      "iam:ListRoles",
+                                      "lambda:*",
+                                      "states:*",
+                                      "states:SendTaskHeartbeat",
+                                      "cloudformation:ListStackResources"
+                                  ],
+                                  "Resource": [
+                                      "arn:aws:states:*:*:*:EBSEncryption*",
+                                      { "Fn::Join" : [ "", [ "arn:aws:lambda:*:*:function:", { "Ref" : "AWS::StackName" }, "*" ] ] }
+                                  ]                      
+                              },
+                              {                      
+                                  "Sid": "VisualEditor2",
+                                  "Effect": "Deny",
+                                  "Action": [
+                                      "lambda:TagResource",
+                                      "lambda:InvokeFunction",
+                                      "lambda:UpdateFunctionConfiguration",
+                                      "lambda:InvokeAsync",
+                                      "lambda:UntagResource",
+                                      "lambda:EnableReplication",
+                                      "lambda:PutFunctionConcurrency",
+                                      "lambda:UpdateAlias",
+                                      "lambda:UpdateFunctionCode",
+                                      "lambda:AddPermission",
+                                      "lambda:DeleteAlias",
+                                      "lambda:DeleteFunction",
+                                      "lambda:PublishVersion",
+                                      "lambda:DeleteFunctionConcurrency",
+                                      "lambda:RemovePermission",
+                                      "lambda:CreateAlias",
+                                      "lambda:CreateFunction",
+                                      "lambda:UpdateEventSourceMapping",
+                                      "lambda:CreateEventSourceMapping",
+                                      "lambda:DeleteEventSourceMapping"
+                                  ],
+                                  "Resource": { "Fn::Join" : [ "", [ "arn:aws:lambda:*:*:function:", { "Ref" : "AWS::StackName" }, "*" ] ] }
+                              },
+                              {
+                                  "Sid": "VisualEditor3",
+                                  "Effect": "Deny",
+                                  "Action": [
+                                      "states:SendTaskSuccess",
+                                      "states:SendTaskFailure",
+                                      "states:CreateActivity",
+                                      "states:UpdateStateMachine",
+                                      "states:DeleteStateMachine",
+                                      "states:StartExecution",
+                                      "states:DeleteActivity",
+                                      "states:StopExecution",
+                                      "states:SendTaskHeartbeat",
+                                      "states:GetActivityTask",
+                                      "states:CreateStateMachine"
+                                  ],
+                                  "Resource": "arn:aws:states:*:*:*:EBSEncryption*"
+                              }
+                            ]
+                        }
+                      }
+                   ]
+                 }
+           }, 
+
+        "RoleForLambdaInstanceAndKMS": {
+            "Type": "AWS::IAM::Role",
+            "Properties": {
+                "AssumeRolePolicyDocument": {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Effect": "Allow",
+                            "Principal": {
+                                "Service": [
+                                    "lambda.amazonaws.com"
+                                ]
+                            },
+                            "Action": [
+                                "sts:AssumeRole"
+                            ]
+                        }
+                    ]
+                },
+                "Policies": [
+                    {
+                        "PolicyName": "InLine_Policy_For_Lambda_To_work_with_Instance_and_KMS",
+                        "PolicyDocument": {
+                               "Version": "2012-10-17",
+                               "Statement": [
+                                       {
+                                           "Action": "ec2:*",
+                                           "Resource": "*",
+                                           "Effect": "Allow",
+                                           "Sid": "VisualEditor0"
+                                       },
+                                       {
+                                           "Action": [
+                                               "kms:Decrypt",
+                                               "kms:Encrypt"
+                                           ],
+                                           "Resource": "*",
+                                           "Effect": "Allow",
+                                           "Sid": "VisualEditor1"
+                                       }
+                                   ]
+                               }
+                   }
+                ]
+            }
+        },
+
+        "RoleForLambdaInstanceAndKMSAndSQS": {
+            "Type": "AWS::IAM::Role",
+            "Properties": {
+                "AssumeRolePolicyDocument": {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Effect": "Allow",
+                            "Principal": {
+                                "Service": [
+                                    "lambda.amazonaws.com"
+                                ]
+                            },
+                            "Action": [
+                                "sts:AssumeRole"
+                            ]
+                        }
+                    ]
+                },
+                "Policies": [
+                    {
+                        "PolicyName": "InLine_Policy_For_Lambda_To_work_with_Instance_and_KMS_SQS_for_EC2_start_with_encrypted_EBS",
+                        "PolicyDocument": {
+                               "Version": "2012-10-17",
+                               "Statement": [
+                                       {
+                                           "Action": "ec2:*",
+                                           "Resource": "*",
+                                           "Effect": "Allow",
+                                           "Sid": "VisualEditor0"
+                                       },
+                                       {
+                                           "Action": [
+                                               "kms:RetireGrant",
+                                               "kms:CreateGrant",
+                                               "kms:ReEncrypt*",
+                                               "kms:GenerateDataKey*",
+                                               "kms:Encrypt",
+                                               "kms:DescribeKey",
+                                               "kms:Decrypt"
+                                           ],
+                                           "Resource": "*",
+                                           "Effect": "Allow",
+                                           "Sid": "VisualEditor1"
+                                       },
+                                       {
+                                        "Sid": "VisualEditor2",
+                                        "Effect": "Allow",
+                                        "Action": [
+                                                "sqs:DeleteMessage",
+                                                "sqs:GetQueueUrl",
+                                                "sqs:ListQueues",
+                                                "sqs:ReceiveMessage",
+                                                "sqs:SendMessage",
+                                                "sqs:GetQueueAttributes",
+                                                "sqs:PurgeQueue",
+                                                "sqs:DeleteQueue",
+                                                "sqs:CreateQueue",
+                                                "sqs:SetQueueAttributes"
+                                                  ],
+                                         "Resource": "*"
+                                       }  
+                                   ]
+                               }
+                    }
+                ]
+            }
+        },
+
+        "RoleForLambdaSQS": {
+            "Type": "AWS::IAM::Role",
+            "Properties": {
+                "AssumeRolePolicyDocument": {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Effect": "Allow",
+                            "Principal": {
+                                "Service": [
+                                    "lambda.amazonaws.com"
+                                ]
+                            },
+                            "Action": [
+                                "sts:AssumeRole"
+                            ]
+                        }
+                    ]
+                },
+                "Policies": [
+                    {
+                        "PolicyName": "InLine_Policy_For_Lambda_To_work_with_SQS",
+                        "PolicyDocument": {
+			    "Version": "2012-10-17",
+    			    "Statement": [
+       				 {
+            				"Sid": "VisualEditor0",
+            				"Effect": "Allow",
+            				"Action": [
+                				"sqs:DeleteMessage",
+                				"sqs:GetQueueUrl",
+                				"sqs:ListQueues",
+                				"sqs:ReceiveMessage",
+                				"sqs:SendMessage",
+                				"sqs:GetQueueAttributes",
+                				"sqs:PurgeQueue",
+                				"sqs:DeleteQueue",
+                				"sqs:CreateQueue",
+                				"sqs:SetQueueAttributes"
+            				          ],
+           				 "Resource": "*"
+       				 }
+   					 ]
+			}
+
+                    }
+                ]
+            }
+        },
+
+
+        "RoleForLambdaInstance": {
+            "Type": "AWS::IAM::Role",
+            "Properties": {
+                "AssumeRolePolicyDocument": {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Effect": "Allow",
+                            "Principal": {
+                                "Service": [
+                                    "lambda.amazonaws.com"
+                                ]
+                            },
+                            "Action": [
+                                "sts:AssumeRole"
+                            ]
+                        }
+                    ]
+                },
+                "Policies": [
+                    {
+                        "PolicyName": "InLine_Policy_For_Lambda_To_work_with_Instance",
+                        "PolicyDocument": {
+    					"Version": "2012-10-17",
+    					"Statement": [
+        				{
+            					"Sid": "VisualEditor0",
+            					"Effect": "Allow",
+            					"Action": "ec2:*",
+            					"Resource": "*"
+       					 }
+    					]
+				}
+
+
+                    }
+                ]
+            }
+        },
+
+       "RoleForLambdaInstanceAndSQS": {
+            "Type": "AWS::IAM::Role",
+            "Properties": {
+                "AssumeRolePolicyDocument": {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Effect": "Allow",
+                            "Principal": {
+                                "Service": [
+                                    "lambda.amazonaws.com"
+                                ]
+                            },
+                            "Action": [
+                                "sts:AssumeRole"
+                            ]
+                        }
+                    ]
+                },
+                "Policies": [
+                     {
+                        "PolicyName": "InLine_Policy_For_Lambda_To_work_with_Instance_and_SQS",
+                        "PolicyDocument":                    {
+                                        "Version": "2012-10-17",
+                                        "Statement": [
+                                               {
+                                                "Sid": "VisualEditor0",
+                                                "Effect": "Allow",
+                                                "Action": "ec2:*",
+                                                "Resource": "*"
+                                                },
+                                                {
+                                                "Sid": "VisualEditor1",
+                                                "Effect": "Allow",
+                                                "Action": [
+                                                   "sqs:DeleteMessage",
+                                                   "sqs:GetQueueUrl",
+                                                   "sqs:ListQueues",
+                                                   "sqs:ReceiveMessage",
+                                                   "sqs:SendMessage",
+                                                   "sqs:GetQueueAttributes",
+                                                   "sqs:PurgeQueue",
+                                                   "sqs:DeleteQueue",
+                                                   "sqs:CreateQueue",
+                                                   "sqs:SetQueueAttributes"
+                                                  ],
+                                                "Resource": "*"
+                                                }
+                                             ]
+                                        }
+
+                                        }
+
+                                 ]
+               }
+        },
+
+        "StatesExecutionRole": {
+            "Type": "AWS::IAM::Role",
+            "Properties": {
+                "AssumeRolePolicyDocument": {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Effect": "Allow",
+                            "Principal": {
+                                "Service": [
+                                    {
+                                        "Fn::Sub": "states.${AWS::Region}.amazonaws.com"
+                                    }
+                                ]
+                            },
+                            "Action": "sts:AssumeRole"
+                        }
+                    ]
+                },
+                "Path": "/",
+                "Policies": [
+                    {
+                        "PolicyName": "StatesExecutionPolicy",
+                        "PolicyDocument": {
+                            "Version": "2012-10-17",
+                            "Statement": [
+                                {
+                                    "Effect": "Allow",
+                                    "Action": [
+                                        "lambda:InvokeFunction"
+                                    ],
+                                    "Resource": "*"
+                                }
+                            ]
+                        }
+                    }
+                ]
+            }
+        },
+
+      "Checkcopysnapshotavailable": {
+
+            "Type": "AWS::Lambda::Function",
+            "Properties": {                
+                "Code": {
+                    "ZipFile": {
+                        "Fn::Join": [
+                            "\n",
+                            [
+   
+                                    "def lambda_handler(event, context):",
+                                    "    import boto3, botocore",
+                                    "    region_name = event['region_name']",
+                                    "    my_session = boto3.Session(",
+                                    "                    region_name=region_name",
+                                    "                    )",
+                                    "                    ",
+                                    "    SnapshotId = event['SnapshotId']",
+                                    "    Copy_SnapshotId = event['Copy_SnapshotId']",
+                                    "    my_client = my_session.client('ec2')",
+                                    "    print('Checking snapshot (%s) is available or not ....' % (Copy_SnapshotId))",
+                                    "    waiter_snapshot_complete = my_client.get_waiter('snapshot_completed')",
+                                    "    waiter_snapshot_complete.config.max_attempts = 240",
+                                    "    ",
+                                    "    try:",
+                                    "         # Wait for snapshot to finish",
+                                    "         waiter_snapshot_complete.wait( SnapshotIds=[ Copy_SnapshotId ] )",
+                                    "         result = {'SnapshotId' : SnapshotId,",
+                                    "                   'Copy_SnapshotId' : Copy_SnapshotId,",
+                                    "                   'region_name' : event['region_name'],",
+                                    "                   'error' : 'no',",
+                                    "                   'force' : event['force'],",
+                                    "                   'snapshot_completed' : 'yes',",
+                                    "                   'copy_snapshot_completed' : 'yes',",
+                                    "                   'Volume' : event['Volume'],",
+                                    "                   'delete' : event['delete'],",
+                                    "                   'Instance_Queue' : event['Instance_Queue'],",
+                                    "                   'Volume_Queue' : event['Volume_Queue'],",
+                                    "                   'Instance_Volume_Queue' : event['Instance_Volume_Queue'],",
+                                    "                   'Region_Queue' : event['Region_Queue'],",
+                                    "                   'instance' : event['instance'],",
+                                    "                   'key' : event['key'],",
+                                    "                   'not_instance' : event['not_instance'],",
+                                    "                   'not_volume' : event['not_volume'],",
+                                    "                   'exit_code' : 0",
+                                    "                   }",
+                                    "         return result",
+                                    "    except botocore.exceptions.WaiterError as e:",
+                                    "         my_client.delete_snapshot(SnapshotId=SnapshotId)",
+                                    "         my_client.delete_snapshot(SnapshotId=Copy_SnapshotId)",
+                                    "         print('ERROR: %s, ERROR: Deleting snapshot %s' % ( e, SnapshotId))",
+                                    "         result = {'SnapshotId' : SnapshotId, ",
+                                    "                   'Copy_SnapshotId' : Copy_SnapshotId,",
+                                    "                   'region_name' : event['region_name'],",
+                                    "                   'error' : 'yes',",
+                                    "                   'force' : event['force'],",
+                                    "                   'snapshot_completed' : 'yes',",
+                                    "                   'copy_snapshot_completed' : 'no',",
+                                    "                   'Volume' : event['Volume'],",
+                                    "                   'delete' : event['delete'],",
+                                    "                   'Instance_Queue' : event['Instance_Queue'],",
+                                    "                   'Volume_Queue' : event['Volume_Queue'],",
+                                    "                   'Instance_Volume_Queue' : event['Instance_Volume_Queue'],",
+                                    "                   'instance' : event['instance'],",
+                                    "                   'Region_Queue' : event['Region_Queue'],",
+                                    "                   'key' : event['key'],",
+                                    "                   'not_instance' : event['not_instance'],",
+                                    "                   'not_volume' : event['not_volume'],",
+                                    "                   'exit_code' : 1",
+                                    "                   }",
+                                    "         return result"
+                            ]
+                        ]
+                    }
+                },
+                "Description": "This function is a part of EBS encryption step function",
+                "Handler": "index.lambda_handler",
+                "Role": {
+                    "Fn::GetAtt": [
+                        "RoleForLambdaInstance",
+                        "Arn"
+                    ]
+                },
+                "Runtime": "python3.6",
+                "Timeout": "300"
+            }
+        },
+
+
+
+      "Checkinstancestarted": {
+
+            "Type": "AWS::Lambda::Function",
+            "Properties": {                
+                "Code": {
+                    "ZipFile": {
+                        "Fn::Join": [
+                            "\n",
+                            [
+                                    "def lambda_handler(event, context):",
+                                    "    import boto3, botocore",
+                                    "    region_name = event['region_name']",
+                                    "    instance_id = event['instance']",
+                                    "    my_session = boto3.Session(",
+                                    "                    region_name=region_name",
+                                    "                    )",
+                                    "    ec2 = my_session.resource('ec2')",
+                                    "    my_client = my_session.client('ec2')",
+                                    "    waiter_instance_running = my_client.get_waiter('instance_running')",
+                                    "    # Set the max_attempts for this waiter (default 40)",
+                                    "    waiter_instance_running.config.max_attempts = 80",
+                                    "",
+                                    "    try:",
+                                    "        waiter_instance_running.wait( InstanceIds=[instance_id,])",
+                                    "        print('Instance (%s) started' % (instance_id))",
+                                    "    except botocore.exceptions.WaiterError as e:",
+                                    "        print('ERROR: {}'.format(e))",
+                                    "",
+                                    "    result = {'instance' : instance_id, ",
+                                    "              'region_name' : event['region_name'],",
+                                    "              'delete' : event['delete'],",
+                                    "              'force' : event['force'],",
+                                    "              'Instance_Queue' : event['Instance_Queue'],",
+                                    "              'Volume_Queue' : event['Volume_Queue'],",
+                                    "              'Region_Queue' : event['Region_Queue'],",
+                                    "              'key' : event['key'],",
+                                    "              'not_instance' : event['not_instance'],",
+                                    "              'not_volume' : event['not_volume'],",
+                                    "              'Instance_Volume_Queue' : event['Instance_Volume_Queue']",
+                                    "             }",
+                                    "    return result"   
+
+                            ]
+                        ]
+                    }
+                },
+                "Description": "This function is a part of EBS encryption step function",
+                "Handler": "index.lambda_handler",
+                "Role": {
+                    "Fn::GetAtt": [
+                        "RoleForLambdaInstance",
+                        "Arn"
+                    ]
+                },
+                "Runtime": "python3.6",
+                "Timeout": "300"
+            }
+        },
+
+
+
+      "Checkinstancestopped": {
+
+            "Type": "AWS::Lambda::Function",
+            "Properties": {                
+                "Code": {
+                    "ZipFile": {
+                        "Fn::Join": [
+                            "\n",
+                            [
+                                    "def lambda_handler(event, context):",
+                                    "    import boto3, botocore",
+                                    "",
+                                    "    region_name = event['region_name']",
+                                    "    instance_id = event['instance']",
+                                    "    my_session = boto3.Session(",
+                                    "                    region_name=region_name",
+                                    "                    )",
+                                    "    ec2 = my_session.resource('ec2')",
+                                    "    my_client = my_session.client('ec2')",
+                                    "    waiter_instance_stopped = my_client.get_waiter('instance_stopped')",
+                                    "    # Set the max_attempts for this waiter (default 40)",
+                                    "    waiter_instance_stopped.config.max_attempts = 80",
+                                    "",
+                                    "    try:",
+                                    "        waiter_instance_stopped.wait( InstanceIds=[instance_id,])",
+                                    "        print('Instance (%s) stopped' % (instance_id))",
+                                    "    except botocore.exceptions.WaiterError as e:",
+                                    "        print('ERROR: {}'.format(e))",
+                                    "",
+                                    "    result = {'instance' : instance_id, ",
+                                    "              'region_name' : event['region_name'],",
+                                    "              'delete' : event['delete'],",
+                                    "              'force' : event['force'],",
+                                    "              'Instance_Queue' : event['Instance_Queue'],",
+                                    "              'Volume_Queue' : event['Volume_Queue'],",
+                                    "              'key' : event['key'],",
+                                    "              'not_volume' : event['not_volume'],",
+                                    "              'not_instance' : event['not_instance'],",
+                                    "              'Region_Queue' : event['Region_Queue']",
+                                    "             }",
+                                    "    return result" 
+
+                            ]
+                        ]
+                    }
+                },
+                "Description": "This function is a part of EBS encryption step function",
+                "Handler": "index.lambda_handler",
+                "Role": {
+                    "Fn::GetAtt": [
+                        "RoleForLambdaInstance",
+                        "Arn"
+                    ]
+                },
+                "Runtime": "python3.6",
+                "Timeout": "300"
+            }
+        },
+
+
+
+      "Checksnapshotavailable": {
+
+            "Type": "AWS::Lambda::Function",
+            "Properties": {                
+                "Code": {
+                    "ZipFile": {
+                        "Fn::Join": [
+                            "\n",
+                            [
+    
+                                    "def lambda_handler(event, context):",
+                                    "    import boto3, botocore",
+                                    "",
+                                    "    region_name = event['region_name']",
+                                    "    my_session = boto3.Session(",
+                                    "                    region_name=region_name",
+                                    "                    )",
+                                    "                    ",
+                                    "    SnapshotId = event['SnapshotId']",
+                                    "    my_client = my_session.client('ec2')",
+                                    "    print('Checking snapshot (%s) is available or not ....' % (SnapshotId))",
+                                    "    waiter_snapshot_complete = my_client.get_waiter('snapshot_completed')",
+                                    "    waiter_snapshot_complete.config.max_attempts = 240",
+                                    "    ",
+                                    "    try:",
+                                    "         # Wait for snapshot to finish",
+                                    "         waiter_snapshot_complete.wait( SnapshotIds=[ SnapshotId ] )",
+                                    "         result = {'SnapshotId' : SnapshotId, ",
+                                    "                   'region_name' : event['region_name'],",
+                                    "                   'error' : 'no',",
+                                    "                   'snapshot_completed' : 'yes',",
+                                    "                   'Volume' : event['Volume'],",
+                                    "                   'force' : event['force'],",
+                                    "                   'exit_code' : 0,",
+                                    "                   'delete' : event['delete'],",
+                                    "                   'Instance_Queue' : event['Instance_Queue'],",
+                                    "                   'Volume_Queue' : event['Volume_Queue'],",
+                                    "                   'Instance_Volume_Queue' : event['Instance_Volume_Queue'],",
+                                    "                   'Region_Queue' : event['Region_Queue'],",
+                                    "                   'key' : event['key'],",
+                                    "                   'not_instance' : event['not_instance'],",
+                                    "                   'not_volume' : event['not_volume'],",
+                                    "                   'instance' : event['instance'] ",
+                                    "                   }",
+                                    "         return result",
+                                    "    except botocore.exceptions.WaiterError as e:",
+                                    "         my_client.delete_snapshot(SnapshotId=SnapshotId)",
+                                    "         print('ERROR: %s, ERROR: Deleting snapshot %s' % ( e, SnapshotId))",
+                                    "         result = {'SnapshotId' : SnapshotId, ",
+                                    "                   'region_name' : event['region_name'],",
+                                    "                   'error' : 'yes',",
+                                    "                   'snapshot_completed' : 'no',",
+                                    "                   'Volume' : event['Volume'],",
+                                    "                   'force' : event['force'],",
+                                    "                   'exit_code' : 1,",
+                                    "                   'delete' : event['delete'],",
+                                    "                   'Instance_Queue' : event['Instance_Queue'],",
+                                    "                   'Volume_Queue' : event['Volume_Queue'],",
+                                    "                   'Instance_Volume_Queue' : event['Instance_Volume_Queue'],",
+                                    "                   'Region_Queue' : event['Region_Queue'],",
+                                    "                   'key' : event['key'],",
+                                    "                   'not_instance' : event['not_instance'],",
+                                    "                   'not_volume' : event['not_volume'],",
+                                    "                   'instance' : event['instance'] ",
+                                    "                   }",
+                                    "         return result"
+                            ]
+                        ]
+                    }
+                },
+                "Description": "This function is a part of EBS encryption step function",
+                "Handler": "index.lambda_handler",
+                "Role": {
+                    "Fn::GetAtt": [
+                        "RoleForLambdaInstance",
+                        "Arn"
+                    ]
+                },
+                "Runtime": "python3.6",
+                "Timeout": "300"
+            }
+        },
+
+
+
+      "Checkvolumeavailable": {
+
+            "Type": "AWS::Lambda::Function",
+            "Properties": {                
+                "Code": {
+                    "ZipFile": {
+                        "Fn::Join": [
+                            "\n",
+                            [
+   
+                                    "def lambda_handler(event, context):",
+                                    "    import boto3, botocore",
+                                    "",
+                                    "    region_name = event['region_name']",
+                                    "    my_session = boto3.Session(",
+                                    "                    region_name=region_name",
+                                    "                    )",
+                                    "                    ",
+                                    "    SnapshotId = event['SnapshotId']",
+                                    "    Copy_SnapshotId = event['Copy_SnapshotId']",
+                                    "    Volume = event['Volume']",
+                                    "    New_Encryoted_Volume = event['New_Encryoted_Volume']",
+                                    "    my_client = my_session.client('ec2')",
+                                    "    print('Checking volume (%s) is available or not ....' % (New_Encryoted_Volume))",
+                                    "    waiter_volume_available = my_client.get_waiter('volume_available')",
+                                    "    waiter_volume_available.config.max_attempts = 240",
+                                    "    ",
+                                    "    try:",
+                                    "         # Wait for snapshot to finish",
+                                    "         waiter_volume_available.wait( VolumeIds=[ New_Encryoted_Volume ] )",
+                                    "         waiter_volume_available.wait( VolumeIds=[ event['Volume']['VolumeId']] )",
+                                    "         result = {'New_Encryoted_Volume' : New_Encryoted_Volume, ",
+                                    "                   'region_name' : event['region_name'],",
+                                    "                   'error' : 'no',",
+                                    "                   'volume_completed' : 'yes',",
+                                    "                   'Volume' : event['Volume'],",
+                                    "                   'exit_code' : 0,",
+                                    "                   'force' : event['force'],",
+                                    "                   'Instance_Queue' : event['Instance_Queue'],",
+                                    "                   'Volume_Queue' : event['Volume_Queue'],",
+                                    "                   'Instance_Volume_Queue' : event['Instance_Volume_Queue'],",
+                                    "                   'delete' : event['delete'],",
+                                    "                   'instance' : event['instance'],",
+                                    "                   'SnapshotId' : event['SnapshotId'], ",
+                                    "                   'Region_Queue' : event['Region_Queue'],",
+                                    "                   'key' : event['key'],",
+                                    "                   'not_instance' : event['not_instance'],",
+                                    "                   'not_volume' : event['not_volume'],",
+                                    "                   'Copy_SnapshotId' : event['Copy_SnapshotId']",
+                                    "                   }",
+                                    "         return result",
+                                    "    except botocore.exceptions.WaiterError as e:",
+                                    "         my_client.delete_snapshot(SnapshotId=event['SnapshotId'])",
+                                    "         my_client.delete_snapshot(SnapshotId=event['Copy_SnapshotId'])",
+                                    "         my_client.delete_volume(VolumeId=event['New_Encryoted_Volume'])",
+                                    "         print('ERROR: %s, ERROR: Deleting snapshot %s' % ( e, SnapshotId))",
+                                    "         result = {'New_Encryoted_Volume' : New_Encryoted_Volume, ",
+                                    "                   'region_name' : event['region_name'],",
+                                    "                   'error' : 'yes',",
+                                    "                   'volume_completed' : 'no',",
+                                    "                   'Volume' : event['Volume'],",
+                                    "                   'exit_code' : 1,",
+                                    "                   'force' : event['force'],",
+                                    "                   'Instance_Queue' : event['Instance_Queue'],",
+                                    "                   'Volume_Queue' : event['Volume_Queue'],",
+                                    "                   'Instance_Volume_Queue' : event['Instance_Volume_Queue'],",
+                                    "                   'delete' : event['delete'],",
+                                    "                   'instance' : event['instance'],",
+                                    "                   'SnapshotId' : event['SnapshotId'], ",
+                                    "                   'Region_Queue' : event['Region_Queue'],",
+                                    "                   'key' : event['key'],",
+                                    "                   'not_instance' : event['not_instance'],",
+                                    "                   'not_volume' : event['not_volume'],",
+                                    "                   'Copy_SnapshotId' : event['Copy_SnapshotId']",
+                                    "                   }",
+                                    "         return result"
+                            ]
+                        ]
+                    }
+                },
+                "Description": "This function is a part of EBS encryption step function",
+                "Handler": "index.lambda_handler",
+                "Role": {
+                    "Fn::GetAtt": [
+                        "RoleForLambdaInstance",
+                        "Arn"
+                    ]
+                },
+                "Runtime": "python3.6",
+                "Timeout": "300"
+            }
+        },
+
+
+
+      "Createcopyofsnapshot": {
+
+            "Type": "AWS::Lambda::Function",
+            "Properties": {                
+                "Code": {
+                    "ZipFile": {
+                        "Fn::Join": [
+                            "\n",
+                            [
+                                    "def lambda_handler(event, context):",
+                                    "    import boto3, botocore",
+                                    "",
+                                    "    region_name = event['region_name']",
+                                    "    SnapshotId = event['SnapshotId']",
+                                    "    if event['snapshot_completed'] != 'yes' :",
+                                    "        print('Snapshot (%s) is not fount, Quiting ....' % (SnapshotId)) ",
+                                    "    my_session = boto3.Session(",
+                                    "                    region_name=region_name",
+                                    "                    )",
+                                    "    my_client = my_session.client('ec2')",
+                                    "    print('Creating encrypted copy of snapshot (%s), Copying ....' % (SnapshotId))",
+                                    "    ",
+                                    "    if event['key'] != 'default' :",
+                                    "        snapshot = my_client.copy_snapshot( SourceRegion=region_name, SourceSnapshotId=SnapshotId, Description='Encrypted copy of snapshot ({})'.format(SnapshotId), KmsKeyId=event['key'], Encrypted=True )",
+                                    "    else :",
+                                    "        snapshot = my_client.copy_snapshot( SourceRegion=region_name, SourceSnapshotId=SnapshotId, Description='Encrypted copy of snapshot ({})'.format(SnapshotId), Encrypted=True )",
+                                    "        ",
+                                    "    result = {'SnapshotId' : SnapshotId, ",
+                                    "              'Copy_SnapshotId' : snapshot['SnapshotId'], ",
+                                    "              'region_name' : event['region_name'],",
+                                    "              'Volume' : event['Volume'],",
+                                    "              'delete' : event['delete'],",
+                                    "              'force' : event['force'],",
+                                    "              'Instance_Queue' : event['Instance_Queue'],",
+                                    "              'Volume_Queue' : event['Volume_Queue'],",
+                                    "              'Instance_Volume_Queue' : event['Instance_Volume_Queue'],",
+                                    "              'Region_Queue' : event['Region_Queue'],",
+                                    "              'key' : event['key'],",
+                                    "              'not_instance' : event['not_instance'],",
+                                    "              'not_volume' : event['not_volume'],",
+                                    "              'instance' : event['instance']",
+                                    "             }",
+                                    "    return result"   
+
+                            ]
+                        ]
+                    }
+                },
+                "Description": "This function is a part of EBS encryption step function",
+                "Handler": "index.lambda_handler",
+                "Role": {
+                    "Fn::GetAtt": [
+                        "RoleForLambdaInstanceAndKMS",
+                        "Arn"
+                    ]
+                },
+                "Runtime": "python3.6",
+                "Timeout": "300"
+            }
+        },
+
+
+
+      "Createencryotedvolume": {
+
+            "Type": "AWS::Lambda::Function",
+            "Properties": {                
+                "Code": {
+                    "ZipFile": {
+                        "Fn::Join": [
+                            "\n",
+                            [
+                                    "def lambda_handler(event, context):",
+                                    "    import boto3, botocore",
+                                    "",
+                                    "    region_name = event['region_name']",
+                                    "    SnapshotId = event['SnapshotId']",
+                                    "    Copy_SnapshotId = event['Copy_SnapshotId']",
+                                    "    Volume = event['Volume']",
+                                    "    delete = event['delete']",
+                                    "    instance_id = event['instance']",
+                                    "    if event['copy_snapshot_completed'] != 'yes' :",
+                                    "        print('Copy_snapshot (%s) is not found, Quiting ....' % (Copy_SnapshotId)) ",
+                                    "    my_session = boto3.Session(",
+                                    "                    region_name=region_name",
+                                    "                    )",
+                                    "    my_client = my_session.client('ec2')",
+                                    "    print('Creating encrypted volume from snapshot (%s), Copying ....' % (Copy_SnapshotId))",
+                                    "",
+                                    "    if Volume.get('VolumeType') == 'io1':",
+                                    "            volume_encrypted = my_client.create_volume(",
+                                    "                SnapshotId = Copy_SnapshotId,",
+                                    "                VolumeType = Volume.get('VolumeType'),",
+                                    "                Iops = Volume.get('Iops'),",
+                                    "                AvailabilityZone = Volume.get('AvailabilityZone')",
+                                    "            )",
+                                    "    else:",
+                                    "            volume_encrypted = my_client.create_volume(",
+                                    "                SnapshotId = Copy_SnapshotId,",
+                                    "                VolumeType = Volume.get('VolumeType'),",
+                                    "                AvailabilityZone = Volume.get('AvailabilityZone')",
+                                    "            )",
+                                    "    ",
+                                    "        # Add original tags to new volume",
+                                    "    if Volume.get('Tags'):",
+                                    "        my_client.create_tags(Resources=[volume_encrypted.get('VolumeId')], Tags=Volume.get('Tags'))",
+                                    "        my_client.create_tags(Resources=[volume_encrypted.get('VolumeId')], Tags= [ {'Key' : 'Made_from' , 'Value' : Volume.get('VolumeId') } ] )",
+                                    "        my_client.create_tags(Resources=[volume_encrypted.get('VolumeId')], Tags= [ {'Key' : 'Remediated_by' , 'Value' : 'ACP' } ] )",
+                                    "    else :",
+                                    "        my_client.create_tags(Resources=[volume_encrypted.get('VolumeId')], Tags= [ {'Key' : 'Made_from' , 'Value' : Volume.get('VolumeId') } ] ) ",
+                                    "        my_client.create_tags(Resources=[volume_encrypted.get('VolumeId')], Tags= [ {'Key' : 'Remediated_by' , 'Value' : 'ACP' } ] )",
+                                    "    ",
+                                    "    ",
+                                    "    # Deattache old volume",
+                                    "    if instance_id != 'Empty' :",
+                                    "        ec2 = my_session.resource('ec2')",
+                                    "        instance = ec2.Instance(instance_id)",
+                                    "        instance.detach_volume(VolumeId=event['Volume']['VolumeId'], Device=event['Volume']['DeviceName'])",
+                                    "    ",
+                                    "    ",
+                                    "    result = {'SnapshotId' : SnapshotId, ",
+                                    "              'Copy_SnapshotId' : Copy_SnapshotId, ",
+                                    "              'New_Encryoted_Volume' : volume_encrypted['VolumeId'],",
+                                    "              'Volume' : event['Volume'],",
+                                    "              'force' : event['force'],",
+                                    "              'region_name' : event['region_name'],",
+                                    "              'Instance_Queue' : event['Instance_Queue'],",
+                                    "              'Volume_Queue' : event['Volume_Queue'],",
+                                    "              'Instance_Volume_Queue' : event['Instance_Volume_Queue'],",
+                                    "              'Region_Queue' : event['Region_Queue'],",
+                                    "              'delete' : event['delete'],",
+                                    "              'key' : event['key'],",
+                                    "              'not_instance' : event['not_instance'],",
+                                    "              'not_volume' : event['not_volume'],",
+                                    "              'instance' : event['instance']",
+                                    "             }",
+                                    "    return result"
+                            ]
+                        ]
+                    }
+                },
+                "Description": "This function is a part of EBS encryption step function",
+                "Handler": "index.lambda_handler",
+                "Role": {
+                    "Fn::GetAtt": [
+                        "RoleForLambdaInstanceAndKMS",
+                        "Arn"
+                    ]
+                },
+                "Runtime": "python3.6",
+                "Timeout": "300"
+            }
+        },
+
+
+
+      "Createsnapshot": {
+
+            "Type": "AWS::Lambda::Function",
+            "Properties": {                
+                "Code": {
+                    "ZipFile": {
+                        "Fn::Join": [
+                            "\n",
+                            [
+                                    "def lambda_handler(event, context):",
+                                    "    import boto3, botocore,ast",
+                                    "",
+                                    "    region_name = event['region_name']",
+                                    "    if event.get('instance') :",
+                                    "        instance = event.get('instance') ",
+                                    "    else :",
+                                    "        instance = 'Empty'",
+                                    "        ",
+                                    "    my_session = boto3.Session(",
+                                    "                    region_name=region_name",
+                                    "                    )",
+                                    "    my_client = my_session.client('ec2')",
+                                    "    v_dict = ast.literal_eval(event.get('Volume'))",
+                                    "    r = v_dict['VolumeId']",
+                                    "    print('Volume (%s) is unencrypted and not attached to any instance, Encrypting ....' % (r))",
+                                    "    snapshot = my_client.create_snapshot(VolumeId=r, Description='Snapshot of volume ({})'.format(r))",
+                                    "         ",
+                                    "    result = {'SnapshotId' : snapshot['SnapshotId'] , ",
+                                    "              'region_name' : event['region_name'],",
+                                    "              'Volume' : v_dict,",
+                                    "              'delete' : event['delete'],",
+                                    "              'force' : event['force'],",
+                                    "              'Instance_Queue' : event['Instance_Queue'],",
+                                    "              'Volume_Queue' : event['Volume_Queue'],",
+                                    "              'Instance_Volume_Queue' : event['Instance_Volume_Queue'],",
+                                    "              'Region_Queue' : event['Region_Queue'],",
+                                    "              'key' : event['key'],",
+                                    "              'not_instance' : event['not_instance'],",
+                                    "              'not_volume' : event['not_volume'],",
+                                    "              'instance' : instance",
+                                    "             }",
+                                    "    return result"
+                            ]
+                        ]
+                    }
+                },
+                "Description": "This function is a part of EBS encryption step function",
+                "Handler": "index.lambda_handler",
+                "Role": {
+                    "Fn::GetAtt": [
+                        "RoleForLambdaInstance",
+                        "Arn"
+                    ]
+                },
+                "Runtime": "python3.6",
+                "Timeout": "300"
+            }
+        },
+
+
+
+      "Deattachattachvolume": {
+
+            "Type": "AWS::Lambda::Function",
+            "Properties": {                
+                "Code": {
+                    "ZipFile": {
+                        "Fn::Join": [
+                            "\n",
+                            [
+                                    "def lambda_handler(event, context):",
+                                    "    import boto3, botocore, ast",
+                                    "",
+                                    "    region_name = event['region_name']",
+                                    "    instance_id = event['instance']",
+                                    "    my_session = boto3.Session(",
+                                    "                    region_name=region_name",
+                                    "                    )",
+                                    "    ec2 = my_session.resource('ec2')",
+                                    "    my_client = my_session.client('ec2')",
+                                    "    instance = ec2.Instance(instance_id)",
+                                    "",
+                                    "    #instance.detach_volume(VolumeId=event['Volume']['VolumeId'], Device=event['Volume']['DeviceName'])",
+                                    "    ",
+                                    "    instance.attach_volume(VolumeId=event['New_Encryoted_Volume'], Device=event['Volume']['DeviceName'])",
+                                    "    ",
+                                    "    instance.modify_attribute(BlockDeviceMappings=[ {'DeviceName': event['Volume']['DeviceName'],'Ebs': {'DeleteOnTermination':event['Volume']['DeleteOnTermination'],},},],)         ",
+                                    "",
+                                    "",
+                                    "    result = {'instance' : instance_id, ",
+                                    "              'region_name' : event['region_name'],",
+                                    "              'delete' : event['delete'],",
+                                    "              'Instance_Queue' : event['Instance_Queue'],",
+                                    "              'Volume_Queue' : event['Volume_Queue'],",
+                                    "              'force' : event['force'],",
+                                    "              'Instance_Volume_Queue' : event['Instance_Volume_Queue'],",
+                                    "              'New_Encryoted_Volume' : event['New_Encryoted_Volume'],",
+                                    "              'Volume' : event['Volume'],",
+                                    "              'SnapshotId' : event['SnapshotId'],",
+                                    "              'Region_Queue' : event['Region_Queue'],",
+                                    "              'key' : event['key'],",
+                                    "              'not_instance' : event['not_instance'],",
+                                    "              'not_volume' : event['not_volume'],",
+                                    "              'Copy_SnapshotId' : event['Copy_SnapshotId']",
+                                    "             }",
+                                    "    return result"   
+
+                            ]
+                        ]
+                    }
+                },
+                "Description": "This function is a part of EBS encryption step function",
+                "Handler": "index.lambda_handler",
+                "Role": {
+                    "Fn::GetAtt": [
+                        "RoleForLambdaInstance",
+                        "Arn"
+                    ]
+                },
+                "Runtime": "python3.6",
+                "Timeout": "300"
+            }
+        },
+
+
+
+      "Deletequeue": {
+
+            "Type": "AWS::Lambda::Function",
+            "Properties": {                
+                "Code": {
+                    "ZipFile": {
+                        "Fn::Join": [
+                            "\n",
+                            [
+                                    "import boto3",
+                                    "def lambda_handler(event, context):",
+                                    "    region_name = event[-1][-1]['region_name']",
+                                    "    my_session = boto3.Session(region_name=region_name)",
+                                    "    my_client = my_session.client('sqs')",
+                                    "    ",
+                                    "    my_client.delete_queue(QueueUrl= event[-1][-1]['Instance_Queue'])",
+                                    "    my_client.delete_queue(QueueUrl= event[-1][-1]['Volume_Queue'])",
+                                    "    ",
+                                    "    ",
+                                    "    result = { ",
+                                    "              'region_name' : event[-1][-1]['region_name'],",
+                                    "              'delete' : event[-1][-1]['delete'],",
+                                    "              'Instance_Queue' : event[-1][-1]['Instance_Queue'],",
+                                    "              'Volume_Queue' : event[-1][-1]['Volume_Queue'],",
+                                    "              'Instance_Volume_Queue' : event[-1][-1]['Instance_Volume_Queue'],",
+                                    "              'force' : event[-1][-1]['force'],",
+                                    "              'Region_Queue' : event[-1][-1]['Region_Queue'],",
+                                    "              'key' : event[-1][-1]['key'],",
+                                    "              'not_volume' : event[-1][-1]['not_volume'],",
+                                    "              'not_instance' : event[-1][-1]['not_instance'],",
+                                    "              'instance' : event[-1][-1].get('instance')",
+                                    "              }",
+                                    "",
+                                    "  ",
+                                    "    return result        ",
+                                    "            ",
+                                    " "
+                            ]
+                        ]
+                    }
+                },
+                "Description": "This function is a part of EBS encryption step function",
+                "Handler": "index.lambda_handler",
+                "Role": {
+                    "Fn::GetAtt": [
+                        "RoleForLambdaSQS",
+                        "Arn"
+                    ]
+                },
+                "Runtime": "python3.6",
+                "Timeout": "300"
+            }
+        },
+
+
+
+      "Deleteregionqueue": {
+
+            "Type": "AWS::Lambda::Function",
+            "Properties": {                
+                "Code": {
+                    "ZipFile": {
+                        "Fn::Join": [
+                            "\n",
+                            [
+   
+                                    "import boto3",
+                                    "def lambda_handler(event, context):",
+                                    "",
+                                    "    my_session = boto3.Session()",
+                                    "    my_client = my_session.client('sqs')",
+                                    "    ",
+                                    "    my_client.delete_queue(QueueUrl= event['Region_Queue'])",
+                                    "",
+                                    "    ",
+                                    "   ",
+                                    "",
+                                    "  ",
+                                    "    return True       ",
+                                    "          "
+                            ]
+                        ]
+                    }
+                },
+                "Description": "This function is a part of EBS encryption step function",
+                "Handler": "index.lambda_handler",
+                "Role": {
+                    "Fn::GetAtt": [
+                        "RoleForLambdaSQS",
+                        "Arn"
+                    ]
+                },
+                "Runtime": "python3.6",
+                "Timeout": "300"
+            }
+        },
+
+
+
+      "Deleteresourses": {
+
+            "Type": "AWS::Lambda::Function",
+            "Properties": {                
+                "Code": {
+                    "ZipFile": {
+                        "Fn::Join": [
+                            "\n",
+                            [
+                                    "def lambda_handler(event, context):",
+                                    "    import boto3, botocore",
+                                    "    region_name = event['region_name']",
+                                    "    SnapshotId = event['SnapshotId']",
+                                    "    Copy_SnapshotId = event['Copy_SnapshotId']",
+                                    "    Volume = event['Volume']",
+                                    "    delete = event['delete']",
+                                    "    ",
+                                    "    my_session = boto3.Session(",
+                                    "                    region_name=region_name",
+                                    "                    )",
+                                    "    my_client = my_session.client('ec2')",
+                                    "",
+                                    "    ",
+                                    "    if delete == 'yes' :",
+                                    "        print('Info : Remove original volume {}, Will be removed once new volume is attached'.format(Volume.get('VolumeId')))",
+                                    "        my_client.delete_volume( VolumeId = Volume.get('VolumeId') )",
+                                    "        print('Info : Remove snapshot {}'.format(SnapshotId)) ",
+                                    "        my_client.delete_snapshot( SnapshotId = SnapshotId )",
+                                    "        print('Info : Remove encrypted snapshot {}'.format(Copy_SnapshotId)) ",
+                                    "        my_client.delete_snapshot( SnapshotId = Copy_SnapshotId )",
+                                    "    else :",
+                                    "        print('Info : Not removing original volume {}'.format(Volume.get('VolumeId')))",
+                                    "        print('Info : Remove snapshot {}'.format(SnapshotId))",
+                                    "        my_client.delete_snapshot( SnapshotId = SnapshotId )",
+                                    "        print('Info : Remove encrypted snapshot {}'.format(Copy_SnapshotId))",
+                                    "        my_client.delete_snapshot( SnapshotId = Copy_SnapshotId )",
+                                    "",
+                                    "    ",
+                                    "    result = {'SnapshotId' : SnapshotId, ",
+                                    "              'Copy_SnapshotId' : Copy_SnapshotId, ",
+                                    "              'New_Encryoted_Volume' : event['New_Encryoted_Volume'],",
+                                    "              'Volume' : event['Volume'],",
+                                    "              'force' : event['force'],",
+                                    "              'region_name' : event['region_name'],",
+                                    "              'Instance_Queue' : event['Instance_Queue'],",
+                                    "              'Volume_Queue' : event['Volume_Queue'],",
+                                    "              'Instance_Volume_Queue' : event['Instance_Volume_Queue'],",
+                                    "              'Region_Queue' : event['Region_Queue'],",
+                                    "              'delete' : event['delete'],",
+                                    "              'key' : event['key'],",
+                                    "              'not_volume' : event['not_volume'],",
+                                    "              'not_instance' : event['not_instance'],",
+                                    "              'instance' : event['instance']",
+                                    "             }",
+                                    "    return result"
+                            ]
+                        ]
+                    }
+                },
+                "Description": "This function is a part of EBS encryption step function",
+                "Handler": "index.lambda_handler",
+                "Role": {
+                    "Fn::GetAtt": [
+                        "RoleForLambdaInstance",
+                        "Arn"
+                    ]
+                },
+                "Runtime": "python3.6",
+                "Timeout": "300"
+            }
+        },
+
+
+
+      "Readfrominstancequeue": {
+
+            "Type": "AWS::Lambda::Function",
+            "Properties": {                
+                "Code": {
+                    "ZipFile": {
+                        "Fn::Join": [
+                            "\n",
+                            [
+   
+                                    "import boto3",
+                                    "from random import randint",
+                                    "from time import sleep",
+                                    "def lambda_handler(event, context):",
+                                    "    region_name = event['region_name']",
+                                    "    my_session = boto3.Session(region_name=region_name)",
+                                    "    my_client = my_session.client('sqs')",
+                                    "    queue_responce = my_client.get_queue_attributes(QueueUrl=event['Instance_Queue'], AttributeNames=['All'])",
+                                    "    mesg = None",
+                                    "    message_count = 0",
+                                    "    sleep(randint(10,20))",
+                                    "    message_count = int(queue_responce['Attributes']['ApproximateNumberOfMessages']) + int(queue_responce['Attributes']['ApproximateNumberOfMessagesNotVisible']) + int(queue_responce['Attributes']['ApproximateNumberOfMessagesDelayed'])",
+                                    "    if message_count > 0 :",
+                                    "        #for message in my_client.receive_message(QueueUrl=event['Instance_Queue']) :",
+                                    "        message = my_client.receive_message(QueueUrl=event['Instance_Queue'])",
+                                    "        if message.get('Messages') :",
+                                    "            mesg = (message['Messages'][0]['Body'])",
+                                    "            responce = my_client.delete_message(QueueUrl=event['Instance_Queue'], ReceiptHandle=message['Messages'][0]['ReceiptHandle'])",
+                                    "        else :",
+                                    "            mesg = 'Empty'",
+                                    "        ",
+                                    "    else :",
+                                    "        print('Info : Empty instance queue')",
+                                    "        mesg='Empty'",
+                                    "    result = { ",
+                                    "              'region_name' : event['region_name'],",
+                                    "              'Instance' : mesg,",
+                                    "              'delete' : event['delete'],",
+                                    "              'Instance_Queue' : event['Instance_Queue'],",
+                                    "              'force' : event['force'],",
+                                    "              'Volume_Queue' : event['Volume_Queue'],",
+                                    "              'Instance_Volume_Queue' : event['Instance_Volume_Queue'],",
+                                    "              'key' : event['key'],",
+                                    "              'not_volume' : event['not_volume'],",
+                                    "              'not_instance' : event['not_instance'],",
+                                    "              'Region_Queue' : event['Region_Queue'],",
+                                    "              'instance' : event.get('Instance')",
+                                    "              }",
+                                    "    return result"
+                            ]
+                        ]
+                    }
+                },
+                "Description": "This function is a part of EBS encryption step function",
+                "Handler": "index.lambda_handler",
+                "Role": {
+                    "Fn::GetAtt": [
+                        "RoleForLambdaSQS",
+                        "Arn"
+                    ]
+                },
+                "Runtime": "python3.6",
+                "Timeout": "300"
+            }
+        },
+
+
+
+      "Readfromregionqueue": {
+
+            "Type": "AWS::Lambda::Function",
+            "Properties": {                
+                "Code": {
+                    "ZipFile": {
+                        "Fn::Join": [
+                            "\n",
+                            [
+                                    "import boto3,ast",
+                                    "def lambda_handler(event, context):",
+                                    "    #region_name = event['region_name']",
+                                    "    my_session = boto3.Session()",
+                                    "    my_client = my_session.client('sqs')",
+                                    "    queue_responce = my_client.get_queue_attributes(QueueUrl=event['Region_Queue'], AttributeNames=['All'])",
+                                    "    mesg = None",
+                                    "    message_count = 0",
+                                    "    message_count = int(queue_responce['Attributes']['ApproximateNumberOfMessages']) + int(queue_responce['Attributes']['ApproximateNumberOfMessagesNotVisible']) + int(queue_responce['Attributes']['ApproximateNumberOfMessagesDelayed'])",
+                                    "    if message_count > 0 :",
+                                    "        #for message in my_client.receive_message(QueueUrl=event['Instance_Queue']) :",
+                                    "        message = my_client.receive_message(QueueUrl=event['Region_Queue'])",
+                                    "        m = ast.literal_eval(message['Messages'][0]['Body'])",
+                                    "        mesg = m['region']",
+                                    "        key = m['key']",
+                                    "        responce = my_client.delete_message(QueueUrl=event['Region_Queue'], ReceiptHandle=message['Messages'][0]['ReceiptHandle'])",
+                                    "    else :",
+                                    "        print('Info : Empty region queue')",
+                                    "        mesg='Empty'",
+                                    "        key=None",
+                                    "    result = { ",
+                                    "              'region_name' : mesg,",
+                                    "              'delete' : event['delete'],",
+                                    "              'key' : key,",
+                                    "              'Region_Queue' : event['Region_Queue'],",
+                                    "              'not_instance' : event['not_instance'],",
+                                    "              'not_volume' : event['not_volume'],",
+                                    "              'force' : event.get('force')",
+                                    "              }",
+                                    "    return result        "   
+
+                            ]
+                        ]
+                    }
+                },
+                "Description": "This function is a part of EBS encryption step function",
+                "Handler": "index.lambda_handler",
+                "Role": {
+                    "Fn::GetAtt": [
+                        "RoleForLambdaSQS",
+                        "Arn"
+                    ]
+                },
+                "Runtime": "python3.6",
+                "Timeout": "300"
+            }
+        },
+
+
+
+      "Readfromvolumequeue": {
+
+            "Type": "AWS::Lambda::Function",
+            "Properties": {                
+                "Code": {
+                    "ZipFile": {
+                        "Fn::Join": [
+                            "\n",
+                            [
+   
+                                    "import boto3",
+                                    "def lambda_handler(event, context):",
+                                    "    region_name = event['region_name']",
+                                    "    my_session = boto3.Session(region_name=region_name)",
+                                    "    my_client = my_session.client('sqs')",
+                                    "    if not event.get('instance') :",
+                                    "        print('instance null')",
+                                    "        queue = event['Volume_Queue']",
+                                    "    elif event.get('instance') == 'Empty' :",
+                                    "        print('instance Empty')",
+                                    "        queue = event['Volume_Queue']",
+                                    "    else :",
+                                    "        print('instance')",
+                                    "        queue = event['Instance_Volume_Queue']",
+                                    "        ",
+                                    "    ",
+                                    "    queue_responce = my_client.get_queue_attributes(QueueUrl=queue, AttributeNames=['All'])",
+                                    "    mesg = None",
+                                    "    message_count = 0",
+                                    "    message_count = int(queue_responce['Attributes']['ApproximateNumberOfMessages']) + int(queue_responce['Attributes']['ApproximateNumberOfMessagesNotVisible']) + int(queue_responce['Attributes']['ApproximateNumberOfMessagesDelayed'])",
+                                    "    if message_count > 0 :",
+                                    "        #for message in my_client.receive_message(QueueUrl=queue) :",
+                                    "        message = my_client.receive_message(QueueUrl=queue)",
+                                    "        if message.get('Messages') :",
+                                    "            mesg = (message['Messages'][0]['Body'])",
+                                    "            responce = my_client.delete_message(QueueUrl=queue, ReceiptHandle=message['Messages'][0]['ReceiptHandle'])",
+                                    "        else :",
+                                    "            mesg = 'Empty'",
+                                    "        ",
+                                    "    else :",
+                                    "        print('Info : Empty volume queue')",
+                                    "        mesg = 'Empty'",
+                                    "    print(mesg)    ",
+                                    "    result = { ",
+                                    "              'region_name' : event['region_name'],",
+                                    "              'Volume' : mesg,",
+                                    "              'delete' : event['delete'],",
+                                    "              'Instance_Queue' : event['Instance_Queue'],",
+                                    "              'force' : event['force'],",
+                                    "              'Volume_Queue' : event['Volume_Queue'],",
+                                    "              'Instance_Volume_Queue' : event['Instance_Volume_Queue'],",
+                                    "              'Region_Queue' : event['Region_Queue'],",
+                                    "              'key' : event['key'],",
+                                    "              'not_instance' : event['not_instance'],",
+                                    "              'not_volume' : event['not_volume'],",
+                                    "              'instance' : event.get('instance')",
+                                    "              }",
+                                    "",
+                                    "  ",
+                                    "    return result        "
+                            ]
+                        ]
+                    }
+                },
+                "Description": "This function is a part of EBS encryption step function",
+                "Handler": "index.lambda_handler",
+                "Role": {
+                    "Fn::GetAtt": [
+                        "RoleForLambdaSQS",
+                        "Arn"
+                    ]
+                },
+                "Runtime": "python3.6",
+                "Timeout": "300"
+            }
+        },
+
+
+
+      "Regions": {
+
+            "Type": "AWS::Lambda::Function",
+            "Properties": {                
+                "Code": {
+                    "ZipFile": {
+                        "Fn::Join": [
+                            "\n",
+                            [
+                                    "import boto3,time,random,sys",
+                                    "from botocore.client import ClientError",
+                                    "",
+                                    "def lambda_handler(event, context):",
+                                    "    my_session = boto3.Session()",
+                                    "    if event.get('region') :",
+                                    "        Regions = event['region']",
+                                    "    else :   ",
+                                    "        my_client = my_session.client('ec2')",
+                                    "        r = my_client.describe_regions()",
+                                    "        Regions = []    ",
+                                    "        for i in r['Regions'] :",
+                                    "            Regions.append(i['RegionName'])",
+                                    "            ",
+                                    "    keys = event.get('key',{})",
+                                    "    ",
+                                    "    r1 = str(random.randint(1000,1000000))",
+                                    "    r2 = str(time.time())",
+                                    "    r = r1 + '.' + r2",
+                                    "    r = r.replace('.','_')",
+                                    "",
+                                    "    my_client = my_session.client('sqs')",
+                                    "    try : ",
+                                    "        region_queue_name = 'Region_'+ r + '.fifo'",
+                                    "        queue_create = my_client.create_queue(QueueName=region_queue_name, Attributes={'FifoQueue' : 'true'  })",
+                                    "        Region_Queue = queue_create.get('QueueUrl')",
+                                    "    except :",
+                                    "        region_queue_name = 'Region_'+ r",
+                                    "        queue_create = my_client.create_queue(QueueName=region_queue_name)",
+                                    "        Region_Queue = queue_create.get('QueueUrl')",
+                                    "        ",
+                                    "    message_count = 0",
+                                    "    queue_responce = my_client.get_queue_attributes(QueueUrl=Region_Queue, AttributeNames=['All'])",
+                                    "",
+                                    "    message_count = int(queue_responce['Attributes']['ApproximateNumberOfMessages']) + int(queue_responce['Attributes']['ApproximateNumberOfMessagesNotVisible']) + int(queue_responce['Attributes']['ApproximateNumberOfMessagesDelayed'])",
+                                    "    if message_count == 0 :",
+                                    "        for r in Regions :",
+                                    "            message = {}",
+                                    "            message['region'] = r",
+                                    "            message['key'] = keys.get(r,'default')",
+                                    "            my_client_kms = boto3.client('kms', region_name=r)",
+                                    "            if message['key'] != 'default' :",
+                                    "                try :",
+                                    "                    key_check = my_client_kms.describe_key(KeyId=message['key'])",
+                                    "                except ClientError as e :",
+                                    "                    if e.response['Error']['Code'] == 'NotFoundException' :",
+                                    "                        print('Error : %s' % (e.response['Error']['Message']))",
+                                    "                        if str(event.get('switch_to_default_cmk')).lower() == 'yes' :",
+                                    "                            message['key'] = 'default'",
+                                    "                        else :    ",
+                                    "                            return 'Key %s not available in %s' % (message['key'], r) ",
+                                    "                            ",
+                                    "            try :",
+                                    "                 response = my_client.send_message(QueueUrl=Region_Queue, MessageBody=str(message), MessageDeduplicationId=r, MessageGroupId='messageGroup1')   ",
+                                    "            except :",
+                                    "                 response = my_client.send_message(QueueUrl=Region_Queue, MessageBody=str(message))",
+                                    "            ",
+                                    "            print( 'Info : Region %s, MessageId %s, MD5OfMessageBody %s' % (message, response.get('MessageId'), response.get('MD5OfMessageBody') ))",
+                                    "    else :",
+                                    "        print('Info : Region queue already have %d messages in it' % (message_count) )",
+                                    "    ",
+                                    "    ",
+                                    "    result = {",
+                                    "              'delete' : event['delete'],",
+                                    "              'force' : event.get('force'),",
+                                    "              'not_instance' : event.get('not_instance'),",
+                                    "              'not_volume' : event.get('not_volume'),",
+                                    "              'Region_Queue' : Region_Queue",
+                                    "             }",
+                                    "    ",
+                                    "    return result"
+                            ]
+                        ]
+                    }
+                },
+                "Description": "This function is a part of EBS encryption step function",
+                "Handler": "index.lambda_handler",
+                "Role": {
+                    "Fn::GetAtt": [
+                        "RoleForLambdaInstanceAndSQS",
+                        "Arn"
+                    ]
+                },
+                "Runtime": "python3.6",
+                "Timeout": "300"
+            }
+        },
+
+
+
+      "Scanallvolumesofinstance": {
+
+            "Type": "AWS::Lambda::Function",
+            "Properties": {                
+                "Code": {
+                    "ZipFile": {
+                        "Fn::Join": [
+                            "\n",
+                            [
+                                    "def lambda_handler(event, context):",
+                                    "    import boto3,botocore,random,time",
+                                    "    region_name = event['region_name']",
+                                    "    instance_id = event['instance']",
+                                    "    my_session = boto3.Session( region_name=region_name)",
+                                    "    ec2 = my_session.resource('ec2')",
+                                    "    my_client = my_session.client('ec2')",
+                                    "    volume_list = []",
+                                    "    instance = ec2.Instance(instance_id)",
+                                    "    all_mappings = []",
+                                    "    block_device_mappings = instance.block_device_mappings",
+                                    "    my_session = boto3.Session(region_name=region_name)",
+                                    "    my_client = my_session.client('sqs')",
+                                    "    for device_mapping in block_device_mappings:",
+                                    "        original_mappings = {",
+                                    "            'DeleteOnTermination': device_mapping['Ebs']['DeleteOnTermination'],",
+                                    "            'VolumeId': device_mapping['Ebs']['VolumeId'],",
+                                    "            'DeviceName': device_mapping['DeviceName'],",
+                                    "            }",
+                                    "        all_mappings.append(original_mappings)",
+                                    "    volumes = [v for v in instance.volumes.all()]",
+                                    "    for volume in volumes:",
+                                    "        volume_encrypted = volume.encrypted",
+                                    "        for mapping in all_mappings:",
+                                    "            if mapping['VolumeId'] == volume.volume_id and mapping['VolumeId'] not in event['not_volume']:",
+                                    "                current_volume_data = {",
+                                    "                    'VolumeId': volume.volume_id,",
+                                    "                    'DeleteOnTermination': mapping['DeleteOnTermination'],",
+                                    "                    'DeviceName': mapping['DeviceName'],",
+                                    "                    'VolumeType': volume.volume_type,",
+                                    "                    'Iops': volume.iops,",
+                                    "                    'AvailabilityZone': instance.placement['AvailabilityZone']",
+                                    "                    }",
+                                    "                if volume_encrypted:",
+                                    "                    already_encrypted = 'yes'",
+                                    "                    print('** Volume ({}) is already encrypted'.format(volume.id))",
+                                    "                else :",
+                                    "                    volume_list.append(current_volume_data)",
+                                    "    r1 = str(random.randint(1000,1000000))",
+                                    "    r2 = str(time.time())",
+                                    "    r = r1 + '.' + r2",
+                                    "    r = r.replace('.','_')",
+                                    "    r = instance_id + '_' + r + '_' + region_name",
+                                    "    try :",
+                                    "        instance_volume_queue_name = 'InstanceVolume_'+ r + '.fifo'",
+                                    "        queue_create = my_client.create_queue(QueueName=instance_volume_queue_name, Attributes={'FifoQueue' : 'true'  })",
+                                    "        Instance_Volume_Queue = queue_create.get('QueueUrl')",
+                                    "    except :",
+                                    "        instance_volume_queue_name = 'InstanceVolume_'+ r",
+                                    "        queue_create = my_client.create_queue(QueueName=instance_volume_queue_name)",
+                                    "        Instance_Volume_Queue = queue_create.get('QueueUrl')",
+                                    "    message_count = 0",
+                                    "    queue_responce = my_client.get_queue_attributes(QueueUrl=Instance_Volume_Queue, AttributeNames=['All'])",
+                                    "    message_count = int(queue_responce['Attributes']['ApproximateNumberOfMessages']) + int(queue_responce['Attributes']['ApproximateNumberOfMessagesNotVisible']) + int(queue_responce['Attributes']['ApproximateNumberOfMessagesDelayed'])",
+                                    "    if message_count == 0 :",
+                                    "        for message in volume_list :",
+                                    "            try :",
+                                    "                 response = my_client.send_message(QueueUrl=Instance_Volume_Queue, MessageBody=str(message), MessageDeduplicationId=message['VolumeId'], MessageGroupId='messageGroup1')   ",
+                                    "            except :",
+                                    "                 response = my_client.send_message(QueueUrl=Instance_Volume_Queue, MessageBody=str(message))",
+                                    "    else :",
+                                    "        print('Info : Volume queue already have %d messages in it' % (message_count) )",
+                                    "    result = { ",
+                                    "              'region_name' : event['region_name'],",
+                                    "              'Instance_Queue' : event['Instance_Queue'],",
+                                    "              'Volume_Queue' : event['Volume_Queue'],",
+                                    "              'force' : event['force'],",
+                                    "              'delete' : event['delete'],",
+                                    "              'Instance_Volume_Queue' : Instance_Volume_Queue,",
+                                    "              'Region_Queue' : event['Region_Queue'],",
+                                    "              'key' : event['key'],",
+                                    "              'not_instance' : event['not_instance'],",
+                                    "              'not_volume' : event['not_volume'],",
+                                    "              'instance' : instance_id",
+                                    "              }",
+                                    "    return result"
+                            ]
+                        ]
+                    }
+                },
+                "Description": "This function is a part of EBS encryption step function",
+                "Handler": "index.lambda_handler",
+                "Role": {
+                    "Fn::GetAtt": [
+                        "RoleForLambdaInstanceAndSQS",
+                        "Arn"
+                    ]
+                },
+                "Runtime": "python3.6",
+                "Timeout": "300"
+            }
+        },
+
+
+
+      "Startinstance": {
+
+            "Type": "AWS::Lambda::Function",
+            "Properties": {                
+                "Code": {
+                    "ZipFile": {
+                        "Fn::Join": [
+                            "\n",
+                            [
+   
+                                    "def lambda_handler(event, context):",
+                                    "    import boto3, botocore, ast",
+                                    "",
+                                    "    region_name = event['region_name']",
+                                    "    instance_id = event['instance']",
+                                    "    my_session = boto3.Session(",
+                                    "                    region_name=region_name",
+                                    "                    )",
+                                    "    ec2 = my_session.resource('ec2')",
+                                    "    ",
+                                    "    instance = ec2.Instance(instance_id)",
+                                    "",
+                                    "    instance.start()",
+                                    "    ",
+                                    "    my_client = my_session.client('sqs')",
+                                    "    my_client.delete_queue(QueueUrl= event['Instance_Volume_Queue'])",
+                                    "",
+                                    "",
+                                    "    result = {'instance' : instance_id, ",
+                                    "              'region_name' : event['region_name'],",
+                                    "              'delete' : event['delete'],",
+                                    "              'Instance_Queue' : event['Instance_Queue'],",
+                                    "              'Volume_Queue' : event['Volume_Queue'],",
+                                    "              'force' : event['force'],",
+                                    "              'Instance_Volume_Queue' : event['Instance_Volume_Queue'],",
+                                    "              'Region_Queue' : event['Region_Queue'],",
+                                    "              'key' : event['key'],",
+                                    "              'not_instance' : event['not_instance'],",
+                                    "              'not_volume' : event['not_volume'],",
+                                    "              'Volume' : event['Volume']",
+                                    "             }",
+                                    "    return result"
+                            ]
+                        ]
+                    }
+                },
+                "Description": "This function is a part of EBS encryption step function",
+                "Handler": "index.lambda_handler",
+                "Role": {
+                    "Fn::GetAtt": [
+                        "RoleForLambdaInstanceAndKMSAndSQS",
+                        "Arn"
+                    ]
+                },
+                "Runtime": "python3.6",
+                "Timeout": "300"
+            }
+        },
+
+
+
+      "Stopinstance": {
+
+            "Type": "AWS::Lambda::Function",
+            "Properties": {                
+                "Code": {
+                    "ZipFile": {
+                        "Fn::Join": [
+                            "\n",
+                            [
+   
+                                    "def lambda_handler(event, context):",
+                                    "    import boto3, botocore, ast",
+                                    "",
+                                    "    region_name = event['region_name']",
+                                    "    Instance = ast.literal_eval(event['Instance'])",
+                                    "    instance_id = Instance[0]",
+                                    "    my_session = boto3.Session(",
+                                    "                    region_name=region_name",
+                                    "                    )",
+                                    "    ec2 = my_session.resource('ec2')",
+                                    "    my_client = my_session.client('ec2')",
+                                    "    instance = ec2.Instance(instance_id)",
+                                    "    waiter_instance_exists = my_client.get_waiter('instance_exists')",
+                                    "    waiter_instance_stopped = my_client.get_waiter('instance_stopped')",
+                                    "    waiter_instance_running = my_client.get_waiter('instance_running')",
+                                    "",
+                                    "    try:",
+                                    "         waiter_instance_exists.wait( InstanceIds = [instance_id,] )",
+                                    "    except botocore.exceptions.WaiterError as e:",
+                                    "         print('ERROR: {}'.format(e))",
+                                    "",
+                                    "",
+                                    "    ",
+                                    "    print('Stopping instance (%s)' % (instance_id))",
+                                    "    # Exit if instance is pending, shutting-down, or terminated",
+                                    "    instance_exit_states = [0, 32, 48]",
+                                    "    if instance.state['Code'] in instance_exit_states :",
+                                    "        print('ERROR: Instance is {} please make sure this instance is active.'.format(instance.state['Name']))",
+                                    "        # Validate successful shutdown if it is running or stopping",
+                                    "    if instance.state['Code'] is 16:",
+                                    "        instance.stop()",
+                                    "",
+                                    "",
+                                    "    result = {'instance' : instance_id, ",
+                                    "              'region_name' : event['region_name'],",
+                                    "              'delete' : event['delete'],",
+                                    "              'Instance_Queue' : event['Instance_Queue'],",
+                                    "              'Volume_Queue' : event['Volume_Queue'],",
+                                    "              'force' : event['force'],",
+                                    "              'key' : event['key'],",
+                                    "              'not_volume' : event['not_volume'],",
+                                    "              'not_instance' : event['not_instance'],",
+                                    "              'Region_Queue' : event['Region_Queue']",
+                                    "             }",
+                                    "    return result"
+                            ]
+                        ]
+                    }
+                },
+                "Description": "This function is a part of EBS encryption step function",
+                "Handler": "index.lambda_handler",
+                "Role": {
+                    "Fn::GetAtt": [
+                        "RoleForLambdaInstance",
+                        "Arn"
+                    ]
+                },
+                "Runtime": "python3.6",
+                "Timeout": "300"
+            }
+        },
+
+
+
+      "descvolums": {
+
+            "Type": "AWS::Lambda::Function",
+            "Properties": {                
+                "Code": {
+                    "ZipFile": {
+                        "Fn::Join": [
+                            "\n",
+                            [
+                                   "import boto3",
+                                    "",
+                                    "",
+                                    "def lambda_handler(event, context):",
+                                    "    # TODO implement",
+                                    "    all_mappings = []",
+                                    "    ins_to_check = []",
+                                    "    unattached_vol = []",
+                                    "    #accessKey = event['secret']['accessKey']",
+                                    "    #secretKey = event['secret']['secretKey']",
+                                    "    #Just for test",
+                                    "    region_name = event['region_name']",
+                                    "    my_session = boto3.Session( region_name=region_name )",
+                                    "    my_client = my_session.client('ec2')",
+                                    "    my_details = my_client.describe_volumes()",
+                                    "    for a in my_details.get('Volumes'):",
+                                    "        original_mappings = { }",
+                                    "        if a.get('Attachments') :",
+                                    "             original_mappings['InstanceId'] = a.get('Attachments')[0].get('InstanceId')",
+                                    "        original_mappings['VolumeId'] = a.get('VolumeId')",
+                                    "        original_mappings['Encrypted'] = a.get('Encrypted')",
+                                    "        original_mappings['VolumeType'] = a.get('VolumeType')",
+                                    "        original_mappings['AvailabilityZone'] = a.get('AvailabilityZone')",
+                                    "        original_mappings['Iops'] = a.get('Iops')",
+                                    "        original_mappings['Tags'] = a.get('Tags')",
+                                    "        all_mappings.append(original_mappings)",
+                                    "",
+                                    "    ",
+                                    "    result = {'Volumes' : all_mappings , ",
+                                    "              'region_name' : region_name,",
+                                    "              'delete' : event['delete'],",
+                                    "              'force' : event['force'],",
+                                    "              'key' : event['key'],",
+                                    "              'not_instance' : event['not_instance'],",
+                                    "              'not_volume' : event['not_volume'],",
+                                    "              'Region_Queue' : event['Region_Queue']",
+                                    "              }",
+                                    "    return result" 
+                            ]
+                        ]
+                    }
+                },
+                "Description": "This function is a part of EBS encryption step function",
+                "Handler": "index.lambda_handler",
+                "Role": {
+                    "Fn::GetAtt": [
+                        "RoleForLambdaInstance",
+                        "Arn"
+                    ]
+                },
+                "Runtime": "python3.6",
+                "Timeout": "300"
+            }
+        },
+
+      "Filtervolumeandpush": {
+
+            "Type": "AWS::Lambda::Function",
+            "Properties": {
+                "Code": {
+                    "ZipFile": {
+                        "Fn::Join": [
+                            "\n",
+                            [
+                                    "def lambda_handler(event, context):",
+                                    "    import boto3,time,random",
+                                    "    from botocore.client import ClientError",
+                                    "    unattached_vol = []",
+                                    "    ins_to_check = []",
+                                    "    if not event.get('not_volume') :",
+                                    "        event['not_volume'] = []",
+                                    "    list = event['Volumes']",
+                                    "    for v in list :",
+                                    "        if v.get('InstanceId') is not None :",
+                                    "            if str(v.get('Encrypted')).lower() == 'false' :",
+                                    "                ins_to_check.append(v.get('InstanceId'))",
+                                    "        if v.get('InstanceId') is None :",
+                                    "            if v.get('VolumeId') not in event['not_volume'] and str(v.get('Encrypted')).lower() == 'false' :",
+                                    "                unattached_vol.append(v)",
+                                    "    if event.get('force') :",
+                                    "        ins_to_check = event['force']",
+                                    "        ",
+                                    "    ins_to_check_set = set(ins_to_check)",
+                                    "    ins_to_check_dic = {}",
+                                    "    ",
+                                    "    ",
+                                    "    if not event.get('not_instance') :",
+                                    "        event['not_instance'] = []",
+                                    "        ",
+                                    "    region = event['region_name']",
+                                    "    my_session = boto3.Session(region_name=region)",
+                                    "    ec2 = my_session.resource('ec2')",
+                                    "    for instance_id in ins_to_check_set :",
+                                    "        if instance_id not in event['not_instance'] :",
+                                    "            try :",
+                                    "                instance = ec2.Instance(instance_id)",
+                                    "                l_time = instance.launch_time.strftime('%Y-%m-%d %H:%M:%S')",
+                                    "                l_time = time.mktime(time.strptime(l_time, '%Y-%m-%d %H:%M:%S'))",
+                                    "                ins_to_check_dic[instance_id] = l_time",
+                                    "            except ClientError as e :",
+                                    "                if e.response['Error']['Code'] == 'InvalidInstanceID.NotFound' :",
+                                    "                     pass",
+                                    "    ins_to_check_dic_sorted =  sorted(ins_to_check_dic.items(), key=lambda x: x[1] )",
+                                    "    my_session = boto3.Session(region_name=region)",
+                                    "    my_client = my_session.client('sqs')",
+                                    "    r1 = str(random.randint(1000,1000000))",
+                                    "    r2 = str(time.time())",
+                                    "    r = r1 + '.' + r2",
+                                    "    r = r.replace('.','_')",
+                                    "    r = r + '_' + region",
+                                    "    try :",
+                                    "        volume_queue_name = 'Volume_'+ r + '.fifo'",
+                                    "        queue_create = my_client.create_queue(QueueName=volume_queue_name, Attributes={'FifoQueue' : 'true'  })",
+                                    "        Volume_Queue = queue_create.get('QueueUrl')",
+                                    "        instance_queue_name = 'Instance_'+ r + '.fifo'",
+                                    "        queue_create = my_client.create_queue(QueueName=instance_queue_name, Attributes={'FifoQueue' : 'true'  })",
+                                    "        Instance_Queue = queue_create.get('QueueUrl')",
+                                    "    except :",
+                                    "        volume_queue_name = 'Volume_'+ r",
+                                    "        queue_create = my_client.create_queue(QueueName=volume_queue_name)",
+                                    "        Volume_Queue = queue_create.get('QueueUrl')",
+                                    "        instance_queue_name = 'Instance_'+ r",
+                                    "        queue_create = my_client.create_queue(QueueName=instance_queue_name)",
+                                    "        Instance_Queue = queue_create.get('QueueUrl')",
+                                    "    for message in ins_to_check_dic_sorted :",
+                                    "        try :",
+                                    "             response = my_client.send_message(QueueUrl=Instance_Queue, MessageBody=str(message), MessageDeduplicationId=message[0], MessageGroupId='messageGroup1')",
+                                    "        except :",
+                                    "             response = my_client.send_message(QueueUrl=Instance_Queue, MessageBody=str(message))",
+                                    "    for message in unattached_vol :",
+                                    "        try :",
+                                    "             response = my_client.send_message(QueueUrl=Volume_Queue, MessageBody=str(message), MessageDeduplicationId=message['VolumeId'], MessageGroupId='messageGroup1')",
+                                    "        except :",
+                                    "             response = my_client.send_message(QueueUrl=Volume_Queue, MessageBody=str(message))",
+                                    "    result = { ",
+                                    "              'region_name' : event['region_name'],",
+                                    "              'Instance_Queue' : Instance_Queue,",
+                                    "              'Volume_Queue' : Volume_Queue,",
+                                    "              'Instance_Volume_Queue' : 'Later',",
+                                    "              'Region_Queue' : event['Region_Queue'],",
+                                    "              'force' : event['force'],",
+                                    "              'key' : event['key'],",
+                                    "              'not_instance' : event['not_instance'],",
+                                    "              'not_volume' : event['not_volume'],",
+                                    "              'delete' : event['delete']",
+                                    "              }",
+                                    "    return result"
+                            ]
+                        ]
+                    }
+                },
+                "Description": "This function is a part of EBS encryption step function",
+                "Handler": "index.lambda_handler",
+                "Role": {
+                    "Fn::GetAtt": [
+                        "RoleForLambdaInstanceAndSQS",
+                        "Arn"
+                    ]
+                },
+                "Runtime": "python3.6",
+                "Timeout": "300"
+            }
+        },
+
+
+
+       "EBSEncryption": {
+            "Type": "AWS::StepFunctions::StateMachine",
+            "Properties": {
+            "DefinitionString": { "Fn::Sub" : 
+                "{\n\t\"Comment\": \"Encrypt uncrypted EBS volumes\",\n\t\"StartAt\": \"Regions\",\n\t\"States\": {\n\t\t\"Regions\": {\n\t\t\t\"Type\": \"Task\",\n\t\t\t\"Resource\": \"${Regions.Arn}\",\n\t\t\t\"Next\": \"Read_from_region_queue\"\n\t\t},\n\t\t\"Read_from_region_queue\": {\n\t\t\t\"Type\": \"Task\",\n\t\t\t\"Resource\": \"${Readfromregionqueue.Arn}\",\n\t\t\t\"Next\": \"Check_for_region\"\n\t\t},\n\t\t\"Check_for_region\": {\n\t\t\t\"Type\": \"Choice\",\n\t\t\t\"Choices\": [{\n\t\t\t\t\"Variable\": \"$.region_name\",\n\t\t\t\t\"StringEquals\": \"Empty\",\n\t\t\t\t\"Next\": \"Delete_region_queue\"\n\t\t\t}],\n\t\t\t\"Default\": \"Desc_volums\"\n\t\t},\n\t\t\"Delete_region_queue\": {\n\t\t\t\"Type\": \"Task\",\n\t\t\t\"Resource\": \"${Deleteregionqueue.Arn}\",\n\t\t\t\"Next\": \"All_regions_encrypted\"\n\t\t},\n\t\t\"All_regions_encrypted\": {\n\t\t\t\"Type\": \"Pass\",\n\t\t\t\"End\": true\n\t\t},\n\t\t\"Desc_volums\": {\n\t\t\t\"Type\": \"Task\",\n\t\t\t\"Resource\": \"${descvolums.Arn}\",\n\t\t\t\"Next\": \"Filter_volume_and_push\"\n\t\t},\n\t\t\"Filter_volume_and_push\": {\n\t\t\t\"Type\": \"Task\",\n\t\t\t\"Resource\": \"${Filtervolumeandpush.Arn}\",\n\t\t\t\"Next\": \"Wait 10s\"\n\t\t},\n\t\t\"Wait 10s\": {\n\t\t\t\"Type\": \"Wait\",\n\t\t\t\"Seconds\": 10,\n\t\t\t\"Next\": \"Read_from_queues\"\n\t\t},\n\t\t\"Read_from_queues\": {\n\t\t\t\"Type\": \"Parallel\",\n\t\t\t\"Next\": \"Final_state\",\n\t\t\t\"Branches\": [{\n\t\t\t\t\"StartAt\": \"Read_from_volume_queue\",\n\t\t\t\t\"States\": {\n\t\t\t\t\t\"Read_from_volume_queue\": {\n                                                \"Type\" : \"Parallel\",         \n                                                \"Next\" : \"TBD\",\n                                                \"Branches\" : [\n                                         {\n                                         \"StartAt\": \"Read_from_volume_queue_1x\",\n                                         \"States\" : {\n                                               \"Read_from_volume_queue_1x\": {\n\t\t\t\t\t\t\t\"Type\": \"Task\",\n\t\t\t\t\t\t\t\"Resource\": \"${Readfromvolumequeue.Arn}\",\n\t\t\t\t\t\t\t\"Next\": \"Check_more_volumes_1x\"\n\t\t\t\t\t\t},\n\t\t\t\t\t\t\"Check_more_volumes_1x\": {\n\t\t\t\t\t\t\t\"Type\": \"Choice\",\n\t\t\t\t\t\t\t\"Choices\": [{\n\t\t\t\t\t\t\t\t\"Variable\": \"$.Volume\",\n\t\t\t\t\t\t\t\t\"StringEquals\": \"Empty\",\n\t\t\t\t\t\t\t\t\"Next\": \"All_volumes_encrypted_1x\"\n\t\t\t\t\t\t\t}],\n\t\t\t\t\t\t\t\"Default\": \"Create_snapshot_1x\"\n\t\t\t\t\t\t},\n\t\t\t\t\t\t\"All_volumes_encrypted_1x\": {\n\t\t\t\t\t\t\t\"Type\": \"Pass\",\n\t\t\t\t\t\t\t\"End\": true\n\t\t\t\t\t\t},\n\n\t\t\t\t\t\t\"Create_snapshot_1x\": {\n\t\t\t\t\t\t\t\"Type\": \"Task\",\n\t\t\t\t\t\t\t\"Resource\": \"${Createsnapshot.Arn}\",\n\t\t\t\t\t\t\t\"Next\": \"Check_snapshot_available_1x\"\n\t\t\t\t\t\t},\n\t\t\t\t\t\t\"Check_snapshot_available_1x\": {\n\t\t\t\t\t\t\t\"Type\": \"Task\",\n\t\t\t\t\t\t\t\"Resource\": \"${Checksnapshotavailable.Arn}\",\n\t\t\t\t\t\t\t\"Retry\": [{\n\t\t\t\t\t\t\t\t\"ErrorEquals\": [\"States.TaskFailed\"],\n\t\t\t\t\t\t\t\t\"IntervalSeconds\": 5,\n\t\t\t\t\t\t\t\t\"MaxAttempts\": 60,\n\t\t\t\t\t\t\t\t\"BackoffRate\": 2\n\t\t\t\t\t\t\t}],\n\t\t\t\t\t\t\t\"Next\": \"Create_copy_of_snapshot_1x\"\n\t\t\t\t\t\t},\n\t\t\t\t\t\t\"Create_copy_of_snapshot_1x\": {\n\t\t\t\t\t\t\t\"Type\": \"Task\",\n\t\t\t\t\t\t\t\"Resource\": \"${Createcopyofsnapshot.Arn}\",\n\t\t\t\t\t\t\t\"Next\": \"Check_copy_snapshot_available_1x\"\n\t\t\t\t\t\t},\n\t\t\t\t\t\t\"Check_copy_snapshot_available_1x\": {\n\t\t\t\t\t\t\t\"Type\": \"Task\",\n\t\t\t\t\t\t\t\"Resource\": \"${Checkcopysnapshotavailable.Arn}\",\n\t\t\t\t\t\t\t\"Retry\": [{\n\t\t\t\t\t\t\t\t\"ErrorEquals\": [\"States.TaskFailed\"],\n\t\t\t\t\t\t\t\t\"IntervalSeconds\": 5,\n\t\t\t\t\t\t\t\t\"MaxAttempts\": 60,\n\t\t\t\t\t\t\t\t\"BackoffRate\": 2\n\t\t\t\t\t\t\t}],\n\t\t\t\t\t\t\t\"Next\": \"Create_encryoted_volume_1x\"\n\t\t\t\t\t\t},\n\t\t\t\t\t\t\"Create_encryoted_volume_1x\": {\n\t\t\t\t\t\t\t\"Type\": \"Task\",\n\t\t\t\t\t\t\t\"Resource\": \"${Createencryotedvolume.Arn}\",\n\t\t\t\t\t\t\t\"Next\": \"Check_volume_available_1x\"\n\t\t\t\t\t\t},\n\t\t\t\t\t\t\"Check_volume_available_1x\": {\n\t\t\t\t\t\t\t\"Type\": \"Task\",\n\t\t\t\t\t\t\t\"Resource\": \"${Checkvolumeavailable.Arn}\",\n\t\t\t\t\t\t\t\"Retry\": [{\n\t\t\t\t\t\t\t\t\"ErrorEquals\": [\"States.TaskFailed\"],\n\t\t\t\t\t\t\t\t\"IntervalSeconds\": 5,\n\t\t\t\t\t\t\t\t\"MaxAttempts\": 60,\n\t\t\t\t\t\t\t\t\"BackoffRate\": 2\n\t\t\t\t\t\t\t}],\n\t\t\t\t\t\t\t\"Next\": \"Delete_resourses?_1x\"\n\t\t\t\t\t\t},\n\t\t\t\t\t\t\"Delete_resourses?_1x\": {\n\t\t\t\t\t\t\t\"Type\": \"Task\",\n\t\t\t\t\t\t\t\"Resource\": \"${Deleteresourses.Arn}\",\n\t\t\t\t\t\t\t\"Next\": \"Read_from_volume_queue_1x\"\n\t\t\t\t\t\t}\n\t\t\t\t\t}\n\t\t\t\t},\n                                {\n                                         \"StartAt\": \"Read_from_volume_queue_2x\",\n                                         \"States\" : {\n                                               \"Read_from_volume_queue_2x\": {\n\t\t\t\t\t\t\t\"Type\": \"Task\",\n\t\t\t\t\t\t\t\"Resource\": \"${Readfromvolumequeue.Arn}\",\n\t\t\t\t\t\t\t\"Next\": \"Check_more_volumes_2x\"\n\t\t\t\t\t\t},\n\t\t\t\t\t\t\"Check_more_volumes_2x\": {\n\t\t\t\t\t\t\t\"Type\": \"Choice\",\n\t\t\t\t\t\t\t\"Choices\": [{\n\t\t\t\t\t\t\t\t\"Variable\": \"$.Volume\",\n\t\t\t\t\t\t\t\t\"StringEquals\": \"Empty\",\n\t\t\t\t\t\t\t\t\"Next\": \"All_volumes_encrypted_2x\"\n\t\t\t\t\t\t\t}],\n\t\t\t\t\t\t\t\"Default\": \"Create_snapshot_2x\"\n\t\t\t\t\t\t},\n\t\t\t\t\t\t\"All_volumes_encrypted_2x\": {\n\t\t\t\t\t\t\t\"Type\": \"Pass\",\n\t\t\t\t\t\t\t\"End\": true\n\t\t\t\t\t\t},\n\n\t\t\t\t\t\t\"Create_snapshot_2x\": {\n\t\t\t\t\t\t\t\"Type\": \"Task\",\n\t\t\t\t\t\t\t\"Resource\": \"${Createsnapshot.Arn}\",\n\t\t\t\t\t\t\t\"Next\": \"Check_snapshot_available_2x\"\n\t\t\t\t\t\t},\n\t\t\t\t\t\t\"Check_snapshot_available_2x\": {\n\t\t\t\t\t\t\t\"Type\": \"Task\",\n\t\t\t\t\t\t\t\"Resource\": \"${Checksnapshotavailable.Arn}\",\n\t\t\t\t\t\t\t\"Retry\": [{\n\t\t\t\t\t\t\t\t\"ErrorEquals\": [\"States.TaskFailed\"],\n\t\t\t\t\t\t\t\t\"IntervalSeconds\": 5,\n\t\t\t\t\t\t\t\t\"MaxAttempts\": 60,\n\t\t\t\t\t\t\t\t\"BackoffRate\": 2\n\t\t\t\t\t\t\t}],\n\t\t\t\t\t\t\t\"Next\": \"Create_copy_of_snapshot_2x\"\n\t\t\t\t\t\t},\n\t\t\t\t\t\t\"Create_copy_of_snapshot_2x\": {\n\t\t\t\t\t\t\t\"Type\": \"Task\",\n\t\t\t\t\t\t\t\"Resource\": \"${Createcopyofsnapshot.Arn}\",\n\t\t\t\t\t\t\t\"Next\": \"Check_copy_snapshot_available_2x\"\n\t\t\t\t\t\t},\n\t\t\t\t\t\t\"Check_copy_snapshot_available_2x\": {\n\t\t\t\t\t\t\t\"Type\": \"Task\",\n\t\t\t\t\t\t\t\"Resource\": \"${Checkcopysnapshotavailable.Arn}\",\n\t\t\t\t\t\t\t\"Retry\": [{\n\t\t\t\t\t\t\t\t\"ErrorEquals\": [\"States.TaskFailed\"],\n\t\t\t\t\t\t\t\t\"IntervalSeconds\": 5,\n\t\t\t\t\t\t\t\t\"MaxAttempts\": 60,\n\t\t\t\t\t\t\t\t\"BackoffRate\": 2\n\t\t\t\t\t\t\t}],\n\t\t\t\t\t\t\t\"Next\": \"Create_encryoted_volume_2x\"\n\t\t\t\t\t\t},\n\t\t\t\t\t\t\"Create_encryoted_volume_2x\": {\n\t\t\t\t\t\t\t\"Type\": \"Task\",\n\t\t\t\t\t\t\t\"Resource\": \"${Createencryotedvolume.Arn}\",\n\t\t\t\t\t\t\t\"Next\": \"Check_volume_available_2x\"\n\t\t\t\t\t\t},\n\t\t\t\t\t\t\"Check_volume_available_2x\": {\n\t\t\t\t\t\t\t\"Type\": \"Task\",\n\t\t\t\t\t\t\t\"Resource\": \"${Checkvolumeavailable.Arn}\",\n\t\t\t\t\t\t\t\"Retry\": [{\n\t\t\t\t\t\t\t\t\"ErrorEquals\": [\"States.TaskFailed\"],\n\t\t\t\t\t\t\t\t\"IntervalSeconds\": 5,\n\t\t\t\t\t\t\t\t\"MaxAttempts\": 60,\n\t\t\t\t\t\t\t\t\"BackoffRate\": 2\n\t\t\t\t\t\t\t}],\n\t\t\t\t\t\t\t\"Next\": \"Delete_resourses?_2x\"\n\t\t\t\t\t\t},\n\t\t\t\t\t\t\"Delete_resourses?_2x\": {\n\t\t\t\t\t\t\t\"Type\": \"Task\",\n\t\t\t\t\t\t\t\"Resource\": \"${Deleteresourses.Arn}\",\n\t\t\t\t\t\t\t\"Next\": \"Read_from_volume_queue_2x\"\n\t\t\t\t\t\t}\n\t\t\t\t\t}\n\t\t\t\t},\n                                {\n                                         \"StartAt\": \"Read_from_volume_queue_3x\",\n                                         \"States\" : {\n                                               \"Read_from_volume_queue_3x\": {\n\t\t\t\t\t\t\t\"Type\": \"Task\",\n\t\t\t\t\t\t\t\"Resource\": \"${Readfromvolumequeue.Arn}\",\n\t\t\t\t\t\t\t\"Next\": \"Check_more_volumes_3x\"\n\t\t\t\t\t\t},\n\t\t\t\t\t\t\"Check_more_volumes_3x\": {\n\t\t\t\t\t\t\t\"Type\": \"Choice\",\n\t\t\t\t\t\t\t\"Choices\": [{\n\t\t\t\t\t\t\t\t\"Variable\": \"$.Volume\",\n\t\t\t\t\t\t\t\t\"StringEquals\": \"Empty\",\n\t\t\t\t\t\t\t\t\"Next\": \"All_volumes_encrypted_3x\"\n\t\t\t\t\t\t\t}],\n\t\t\t\t\t\t\t\"Default\": \"Create_snapshot_3x\"\n\t\t\t\t\t\t},\n\t\t\t\t\t\t\"All_volumes_encrypted_3x\": {\n\t\t\t\t\t\t\t\"Type\": \"Pass\",\n\t\t\t\t\t\t\t\"End\": true\n\t\t\t\t\t\t},\n\n\t\t\t\t\t\t\"Create_snapshot_3x\": {\n\t\t\t\t\t\t\t\"Type\": \"Task\",\n\t\t\t\t\t\t\t\"Resource\": \"${Createsnapshot.Arn}\",\n\t\t\t\t\t\t\t\"Next\": \"Check_snapshot_available_3x\"\n\t\t\t\t\t\t},\n\t\t\t\t\t\t\"Check_snapshot_available_3x\": {\n\t\t\t\t\t\t\t\"Type\": \"Task\",\n\t\t\t\t\t\t\t\"Resource\": \"${Checksnapshotavailable.Arn}\",\n\t\t\t\t\t\t\t\"Retry\": [{\n\t\t\t\t\t\t\t\t\"ErrorEquals\": [\"States.TaskFailed\"],\n\t\t\t\t\t\t\t\t\"IntervalSeconds\": 5,\n\t\t\t\t\t\t\t\t\"MaxAttempts\": 60,\n\t\t\t\t\t\t\t\t\"BackoffRate\": 2\n\t\t\t\t\t\t\t}],\n\t\t\t\t\t\t\t\"Next\": \"Create_copy_of_snapshot_3x\"\n\t\t\t\t\t\t},\n\t\t\t\t\t\t\"Create_copy_of_snapshot_3x\": {\n\t\t\t\t\t\t\t\"Type\": \"Task\",\n\t\t\t\t\t\t\t\"Resource\": \"${Createcopyofsnapshot.Arn}\",\n\t\t\t\t\t\t\t\"Next\": \"Check_copy_snapshot_available_3x\"\n\t\t\t\t\t\t},\n\t\t\t\t\t\t\"Check_copy_snapshot_available_3x\": {\n\t\t\t\t\t\t\t\"Type\": \"Task\",\n\t\t\t\t\t\t\t\"Resource\": \"${Checkcopysnapshotavailable.Arn}\",\n\t\t\t\t\t\t\t\"Retry\": [{\n\t\t\t\t\t\t\t\t\"ErrorEquals\": [\"States.TaskFailed\"],\n\t\t\t\t\t\t\t\t\"IntervalSeconds\": 5,\n\t\t\t\t\t\t\t\t\"MaxAttempts\": 60,\n\t\t\t\t\t\t\t\t\"BackoffRate\": 2\n\t\t\t\t\t\t\t}],\n\t\t\t\t\t\t\t\"Next\": \"Create_encryoted_volume_3x\"\n\t\t\t\t\t\t},\n\t\t\t\t\t\t\"Create_encryoted_volume_3x\": {\n\t\t\t\t\t\t\t\"Type\": \"Task\",\n\t\t\t\t\t\t\t\"Resource\": \"${Createencryotedvolume.Arn}\",\n\t\t\t\t\t\t\t\"Next\": \"Check_volume_available_3x\"\n\t\t\t\t\t\t},\n\t\t\t\t\t\t\"Check_volume_available_3x\": {\n\t\t\t\t\t\t\t\"Type\": \"Task\",\n\t\t\t\t\t\t\t\"Resource\": \"${Checkvolumeavailable.Arn}\",\n\t\t\t\t\t\t\t\"Retry\": [{\n\t\t\t\t\t\t\t\t\"ErrorEquals\": [\"States.TaskFailed\"],\n\t\t\t\t\t\t\t\t\"IntervalSeconds\": 5,\n\t\t\t\t\t\t\t\t\"MaxAttempts\": 60,\n\t\t\t\t\t\t\t\t\"BackoffRate\": 2\n\t\t\t\t\t\t\t}],\n\t\t\t\t\t\t\t\"Next\": \"Delete_resourses?_3x\"\n\t\t\t\t\t\t},\n\t\t\t\t\t\t\"Delete_resourses?_3x\": {\n\t\t\t\t\t\t\t\"Type\": \"Task\",\n\t\t\t\t\t\t\t\"Resource\": \"${Deleteresourses.Arn}\",\n\t\t\t\t\t\t\t\"Next\": \"Read_from_volume_queue_3x\"\n\t\t\t\t\t\t}\n\t\t\t\t\t}\n\t\t\t            }\n                                   ]\n                                 },\n                                 \"TBD\" : {\n                                       \"Type\" : \"Pass\", \n                                       \"End\" : true\n                                  }\n                                 }\n                                },\n\t\t\t\t{\n\t\t\t\t\t\"StartAt\": \"Read_from_instance_queue\",\n\t\t\t\t\t\"States\": {\n\t\t\t\t\t\t\"Read_from_instance_queue\": {\n                                                    \"Type\" : \"Parallel\",\n                                                    \"Next\" : \"TBD_instance\",\n                                                    \"Branches\" : [\n                                         {\n                                           \"StartAt\": \"Read_from_instance_queue_1x\",\n                                            \"States\": {\n                                                \"Read_from_instance_queue_1x\": {\n\t\t\t\t\t\t\t\"Type\": \"Task\",\n\t\t\t\t\t\t\t\"Resource\": \"${Readfrominstancequeue.Arn}\",\n\t\t\t\t\t\t\t\"Next\": \"Check_more_instances_1x\"\n\t\t\t\t\t\t},\n\t\t\t\t\t\t\"Check_more_instances_1x\": {\n\t\t\t\t\t\t\t\"Type\": \"Choice\",\n\t\t\t\t\t\t\t\"Choices\": [{\n\t\t\t\t\t\t\t\t\"Variable\": \"$.Instance\",\n\t\t\t\t\t\t\t\t\"StringEquals\": \"Empty\",\n\t\t\t\t\t\t\t\t\"Next\": \"All_instance_volumes_encrypted_1x\"\n\t\t\t\t\t\t\t}],\n\t\t\t\t\t\t\t\"Default\": \"Stop_instance_1x\"\n\t\t\t\t\t\t},\n\t\t\t\t\t\t\"All_instance_volumes_encrypted_1x\": {\n\t\t\t\t\t\t\t\"Type\": \"Pass\",\n\t\t\t\t\t\t\t\"End\": true\n\t\t\t\t\t\t},\n\n\t\t\t\t\t\t\"Stop_instance_1x\": {\n\t\t\t\t\t\t\t\"Type\": \"Task\",\n\t\t\t\t\t\t\t\"Resource\": \"${Stopinstance.Arn}\",\n\t\t\t\t\t\t\t\"Next\": \"Check_instance_stopped_1x\"\n\t\t\t\t\t\t},\n\t\t\t\t\t\t\"Check_instance_stopped_1x\": {\n\t\t\t\t\t\t\t\"Type\": \"Task\",\n\t\t\t\t\t\t\t\"Resource\": \"${Checkinstancestopped.Arn}\",\n\t\t\t\t\t\t\t\"Retry\": [{\n\t\t\t\t\t\t\t\t\"ErrorEquals\": [\"States.TaskFailed\"],\n\t\t\t\t\t\t\t\t\"IntervalSeconds\": 1,\n\t\t\t\t\t\t\t\t\"MaxAttempts\": 6,\n\t\t\t\t\t\t\t\t\"BackoffRate\": 2\n\t\t\t\t\t\t\t}],\n\t\t\t\t\t\t\t\"Next\": \"Scan_all_volumes_of_instance_1x\"\n\t\t\t\t\t\t},\n\t\t\t\t\t\t\"Scan_all_volumes_of_instance_1x\": {\n\t\t\t\t\t\t\t\"Type\": \"Task\",\n\t\t\t\t\t\t\t\"Resource\": \"${Scanallvolumesofinstance.Arn}\",\n\t\t\t\t\t\t\t\"Next\": \"Wait 10s for queue_1x\"\n\t\t\t\t\t\t},\n\t\t\t\t\t\t\"Wait 10s for queue_1x\": {\n\t\t\t\t\t\t\t\"Type\": \"Wait\",\n\t\t\t\t\t\t\t\"Seconds\": 10,\n\t\t\t\t\t\t\t\"Next\": \"Read_from_volume_queue_of_instance_1x\"\n\t\t\t\t\t\t},\n\t\t\t\t\t\t\"Read_from_volume_queue_of_instance_1x\": {\n\t\t\t\t\t\t\t\"Type\": \"Task\",\n\t\t\t\t\t\t\t\"Resource\": \"${Readfromvolumequeue.Arn}\",\n\t\t\t\t\t\t\t\"Next\": \"Check_more_volumes_of_instance_1x\"\n\t\t\t\t\t\t},\n\t\t\t\t\t\t\"Check_more_volumes_of_instance_1x\": {\n\t\t\t\t\t\t\t\"Type\": \"Choice\",\n\t\t\t\t\t\t\t\"Choices\": [{\n\t\t\t\t\t\t\t\t\"Variable\": \"$.Volume\",\n\t\t\t\t\t\t\t\t\"StringEquals\": \"Empty\",\n\t\t\t\t\t\t\t\t\"Next\": \"All_volumes_encrypted_of_instance_1x\"\n\t\t\t\t\t\t\t}],\n\t\t\t\t\t\t\t\"Default\": \"Create_snapshot_volume_of_instance_1x\"\n\t\t\t\t\t\t},\n\t\t\t\t\t\t\"All_volumes_encrypted_of_instance_1x\": {\n\t\t\t\t\t\t\t\"Type\": \"Pass\",\n\t\t\t\t\t\t\t\"Next\": \"Start_instance_1x\"\n\t\t\t\t\t\t},\n\t\t\t\t\t\t\"Start_instance_1x\": {\n\t\t\t\t\t\t\t\"Type\": \"Task\",\n\t\t\t\t\t\t\t\"Resource\": \"${Startinstance.Arn}\",\n\t\t\t\t\t\t\t\"Next\": \"Check_instance_started_1x\"\n\t\t\t\t\t\t},\n\t\t\t\t\t\t\"Check_instance_started_1x\": {\n\t\t\t\t\t\t\t\"Type\": \"Task\",\n\t\t\t\t\t\t\t\"Resource\": \"${Checkinstancestarted.Arn}\",\n\t\t\t\t\t\t\t\"Next\": \"Read_from_instance_queue_1x\"\n\t\t\t\t\t\t},\n\n\t\t\t\t\t\t\"Create_snapshot_volume_of_instance_1x\": {\n\t\t\t\t\t\t\t\"Type\": \"Task\",\n\t\t\t\t\t\t\t\"Resource\": \"${Createsnapshot.Arn}\",\n\t\t\t\t\t\t\t\"Next\": \"Check_snapshot_volume_available_of_instance_1x\"\n\t\t\t\t\t\t},\n\t\t\t\t\t\t\"Check_snapshot_volume_available_of_instance_1x\": {\n\t\t\t\t\t\t\t\"Type\": \"Task\",\n\t\t\t\t\t\t\t\"Resource\": \"${Checksnapshotavailable.Arn}\",\n\t\t\t\t\t\t\t\"Retry\": [{\n\t\t\t\t\t\t\t\t\"ErrorEquals\": [\"States.TaskFailed\"],\n\t\t\t\t\t\t\t\t\"IntervalSeconds\": 5,\n\t\t\t\t\t\t\t\t\"MaxAttempts\": 60,\n\t\t\t\t\t\t\t\t\"BackoffRate\": 2\n\t\t\t\t\t\t\t}],\n\t\t\t\t\t\t\t\"Next\": \"Create_copy_of_snapshot_volume_of_instance_1x\"\n\t\t\t\t\t\t},\n\t\t\t\t\t\t\"Create_copy_of_snapshot_volume_of_instance_1x\": {\n\t\t\t\t\t\t\t\"Type\": \"Task\",\n\t\t\t\t\t\t\t\"Resource\": \"${Createcopyofsnapshot.Arn}\",\n\t\t\t\t\t\t\t\"Next\": \"Check_copy_snapshot_volume_available_of_instance_1x\"\n\t\t\t\t\t\t},\n\t\t\t\t\t\t\"Check_copy_snapshot_volume_available_of_instance_1x\": {\n\t\t\t\t\t\t\t\"Type\": \"Task\",\n\t\t\t\t\t\t\t\"Resource\": \"${Checkcopysnapshotavailable.Arn}\",\n\t\t\t\t\t\t\t\"Retry\": [{\n\t\t\t\t\t\t\t\t\"ErrorEquals\": [\"States.TaskFailed\"],\n\t\t\t\t\t\t\t\t\"IntervalSeconds\": 5,\n\t\t\t\t\t\t\t\t\"MaxAttempts\": 60,\n\t\t\t\t\t\t\t\t\"BackoffRate\": 2\n\t\t\t\t\t\t\t}],\n\t\t\t\t\t\t\t\"Next\": \"Create_encryoted_volume_of_instance_1x\"\n\t\t\t\t\t\t},\n\t\t\t\t\t\t\"Create_encryoted_volume_of_instance_1x\": {\n\t\t\t\t\t\t\t\"Type\": \"Task\",\n\t\t\t\t\t\t\t\"Resource\": \"${Createencryotedvolume.Arn}\",\n\t\t\t\t\t\t\t\"Next\": \"Check_volume_available_of_instance_1x\"\n\t\t\t\t\t\t},\n\t\t\t\t\t\t\"Check_volume_available_of_instance_1x\": {\n\t\t\t\t\t\t\t\"Type\": \"Task\",\n\t\t\t\t\t\t\t\"Resource\": \"${Checkvolumeavailable.Arn}\",\n\t\t\t\t\t\t\t\"Retry\": [{\n\t\t\t\t\t\t\t\t\"ErrorEquals\": [\"States.TaskFailed\"],\n\t\t\t\t\t\t\t\t\"IntervalSeconds\": 5,\n\t\t\t\t\t\t\t\t\"MaxAttempts\": 60,\n\t\t\t\t\t\t\t\t\"BackoffRate\": 2\n\t\t\t\t\t\t\t}],\n\t\t\t\t\t\t\t\"Next\": \"Deattach_attache_volume_1x\"\n\t\t\t\t\t\t},\n\t\t\t\t\t\t\"Deattach_attache_volume_1x\": {\n\t\t\t\t\t\t\t\"Type\": \"Task\",\n\t\t\t\t\t\t\t\"Resource\": \"${Deattachattachvolume.Arn}\",\n\t\t\t\t\t\t\t\"Next\": \"Delete_resourses_volume_of_instance?_1x\"\n\t\t\t\t\t\t},\n\t\t\t\t\t\t\"Delete_resourses_volume_of_instance?_1x\": {\n\t\t\t\t\t\t\t\"Type\": \"Task\",\n\t\t\t\t\t\t\t\"Resource\": \"${Deleteresourses.Arn}\",\n\t\t\t\t\t\t\t\"Next\": \"Read_from_volume_queue_of_instance_1x\"\n\t\t\t\t\t\t}\n\t\t\t\t\t}\n\n\t\t\t\t},\n                                {\n                                           \"StartAt\": \"Read_from_instance_queue_2x\",\n                                           \"States\": {\n                                                \"Read_from_instance_queue_2x\": {\n\t\t\t\t\t\t\t\"Type\": \"Task\",\n\t\t\t\t\t\t\t\"Resource\": \"${Readfrominstancequeue.Arn}\",\n\t\t\t\t\t\t\t\"Next\": \"Check_more_instances_2x\"\n\t\t\t\t\t\t},\n\t\t\t\t\t\t\"Check_more_instances_2x\": {\n\t\t\t\t\t\t\t\"Type\": \"Choice\",\n\t\t\t\t\t\t\t\"Choices\": [{\n\t\t\t\t\t\t\t\t\"Variable\": \"$.Instance\",\n\t\t\t\t\t\t\t\t\"StringEquals\": \"Empty\",\n\t\t\t\t\t\t\t\t\"Next\": \"All_instance_volumes_encrypted_2x\"\n\t\t\t\t\t\t\t}],\n\t\t\t\t\t\t\t\"Default\": \"Stop_instance_2x\"\n\t\t\t\t\t\t},\n\t\t\t\t\t\t\"All_instance_volumes_encrypted_2x\": {\n\t\t\t\t\t\t\t\"Type\": \"Pass\",\n\t\t\t\t\t\t\t\"End\": true\n\t\t\t\t\t\t},\n\n\t\t\t\t\t\t\"Stop_instance_2x\": {\n\t\t\t\t\t\t\t\"Type\": \"Task\",\n\t\t\t\t\t\t\t\"Resource\": \"${Stopinstance.Arn}\",\n\t\t\t\t\t\t\t\"Next\": \"Check_instance_stopped_2x\"\n\t\t\t\t\t\t},\n\t\t\t\t\t\t\"Check_instance_stopped_2x\": {\n\t\t\t\t\t\t\t\"Type\": \"Task\",\n\t\t\t\t\t\t\t\"Resource\": \"${Checkinstancestopped.Arn}\",\n\t\t\t\t\t\t\t\"Retry\": [{\n\t\t\t\t\t\t\t\t\"ErrorEquals\": [\"States.TaskFailed\"],\n\t\t\t\t\t\t\t\t\"IntervalSeconds\": 1,\n\t\t\t\t\t\t\t\t\"MaxAttempts\": 6,\n\t\t\t\t\t\t\t\t\"BackoffRate\": 2\n\t\t\t\t\t\t\t}],\n\t\t\t\t\t\t\t\"Next\": \"Scan_all_volumes_of_instance_2x\"\n\t\t\t\t\t\t},\n\t\t\t\t\t\t\"Scan_all_volumes_of_instance_2x\": {\n\t\t\t\t\t\t\t\"Type\": \"Task\",\n\t\t\t\t\t\t\t\"Resource\": \"${Scanallvolumesofinstance.Arn}\",\n\t\t\t\t\t\t\t\"Next\": \"Wait 10s for queue_2x\"\n\t\t\t\t\t\t},\n\t\t\t\t\t\t\"Wait 10s for queue_2x\": {\n\t\t\t\t\t\t\t\"Type\": \"Wait\",\n\t\t\t\t\t\t\t\"Seconds\": 10,\n\t\t\t\t\t\t\t\t\"Next\": \"Read_from_volume_queue_of_instance_2x\"\n\t\t\t\t\t\t},\n\t\t\t\t\t\t\"Read_from_volume_queue_of_instance_2x\": {\n\t\t\t\t\t\t\t\"Type\": \"Task\",\n\t\t\t\t\t\t\t\"Resource\": \"${Readfromvolumequeue.Arn}\",\n\t\t\t\t\t\t\t\"Next\": \"Check_more_volumes_of_instance_2x\"\n\t\t\t\t\t\t},\n\t\t\t\t\t\t\"Check_more_volumes_of_instance_2x\": {\n\t\t\t\t\t\t\t\"Type\": \"Choice\",\n\t\t\t\t\t\t\t\"Choices\": [{\n\t\t\t\t\t\t\t\t\"Variable\": \"$.Volume\",\n\t\t\t\t\t\t\t\t\"StringEquals\": \"Empty\",\n\t\t\t\t\t\t\t\t\"Next\": \"All_volumes_encrypted_of_instance_2x\"\n\t\t\t\t\t\t\t}],\n\t\t\t\t\t\t\t\"Default\": \"Create_snapshot_volume_of_instance_2x\"\n\t\t\t\t\t\t},\n\t\t\t\t\t\t\"All_volumes_encrypted_of_instance_2x\": {\n\t\t\t\t\t\t\t\"Type\": \"Pass\",\n\t\t\t\t\t\t\t\"Next\": \"Start_instance_2x\"\n\t\t\t\t\t\t},\n\t\t\t\t\t\t\"Start_instance_2x\": {\n\t\t\t\t\t\t\t\"Type\": \"Task\",\n\t\t\t\t\t\t\t\"Resource\": \"${Startinstance.Arn}\",\n\t\t\t\t\t\t\t\"Next\": \"Check_instance_started_2x\"\n\t\t\t\t\t\t},\n\t\t\t\t\t\t\"Check_instance_started_2x\": {\n\t\t\t\t\t\t\t\"Type\": \"Task\",\n\t\t\t\t\t\t\t\"Resource\": \"${Checkinstancestarted.Arn}\",\n\t\t\t\t\t\t\t\"Next\": \"Read_from_instance_queue_2x\"\n\t\t\t\t\t\t},\n\n\t\t\t\t\t\t\"Create_snapshot_volume_of_instance_2x\": {\n\t\t\t\t\t\t\t\"Type\": \"Task\",\n\t\t\t\t\t\t\t\"Resource\": \"${Createsnapshot.Arn}\",\n\t\t\t\t\t\t\t\"Next\": \"Check_snapshot_volume_available_of_instance_2x\"\n\t\t\t\t\t\t},\n\t\t\t\t\t\t\"Check_snapshot_volume_available_of_instance_2x\": {\n\t\t\t\t\t\t\t\"Type\": \"Task\",\n\t\t\t\t\t\t\t\"Resource\": \"${Checksnapshotavailable.Arn}\",\n\t\t\t\t\t\t\t\"Retry\": [{\n\t\t\t\t\t\t\t\t\"ErrorEquals\": [\"States.TaskFailed\"],\n\t\t\t\t\t\t\t\t\"IntervalSeconds\": 5,\n\t\t\t\t\t\t\t\t\"MaxAttempts\": 60,\n\t\t\t\t\t\t\t\t\"BackoffRate\": 2\n\t\t\t\t\t\t\t}],\n\t\t\t\t\t\t\t\"Next\": \"Create_copy_of_snapshot_volume_of_instance_2x\"\n\t\t\t\t\t\t},\n\t\t\t\t\t\t\"Create_copy_of_snapshot_volume_of_instance_2x\": {\n\t\t\t\t\t\t\t\"Type\": \"Task\",\n\t\t\t\t\t\t\t\"Resource\": \"${Createcopyofsnapshot.Arn}\",\n\t\t\t\t\t\t\t\"Next\": \"Check_copy_snapshot_volume_available_of_instance_2x\"\n\t\t\t\t\t\t},\n\t\t\t\t\t\t\"Check_copy_snapshot_volume_available_of_instance_2x\": {\n\t\t\t\t\t\t\t\"Type\": \"Task\",\n\t\t\t\t\t\t\t\"Resource\": \"${Checkcopysnapshotavailable.Arn}\",\n\t\t\t\t\t\t\t\"Retry\": [{\n\t\t\t\t\t\t\t\t\"ErrorEquals\": [\"States.TaskFailed\"],\n\t\t\t\t\t\t\t\t\"IntervalSeconds\": 5,\n\t\t\t\t\t\t\t\t\"MaxAttempts\": 60,\n\t\t\t\t\t\t\t\t\"BackoffRate\": 2\n\t\t\t\t\t\t\t}],\n\t\t\t\t\t\t\t\"Next\": \"Create_encryoted_volume_of_instance_2x\"\n\t\t\t\t\t\t},\n\t\t\t\t\t\t\"Create_encryoted_volume_of_instance_2x\": {\n\t\t\t\t\t\t\t\"Type\": \"Task\",\n\t\t\t\t\t\t\t\"Resource\": \"${Createencryotedvolume.Arn}\",\n\t\t\t\t\t\t\t\"Next\": \"Check_volume_available_of_instance_2x\"\n\t\t\t\t\t\t},\n\t\t\t\t\t\t\"Check_volume_available_of_instance_2x\": {\n\t\t\t\t\t\t\t\"Type\": \"Task\",\n\t\t\t\t\t\t\t\"Resource\": \"${Checkvolumeavailable.Arn}\",\n\t\t\t\t\t\t\t\"Retry\": [{\n\t\t\t\t\t\t\t\t\"ErrorEquals\": [\"States.TaskFailed\"],\n\t\t\t\t\t\t\t\t\"IntervalSeconds\": 5,\n\t\t\t\t\t\t\t\t\"MaxAttempts\": 60,\n\t\t\t\t\t\t\t\t\"BackoffRate\": 2\n\t\t\t\t\t\t\t}],\n\t\t\t\t\t\t\t\"Next\": \"Deattach_attache_volume_2x\"\n\t\t\t\t\t\t},\n\t\t\t\t\t\t\"Deattach_attache_volume_2x\": {\n\t\t\t\t\t\t\t\"Type\": \"Task\",\n\t\t\t\t\t\t\t\"Resource\": \"${Deattachattachvolume.Arn}\",\n\t\t\t\t\t\t\t\"Next\": \"Delete_resourses_volume_of_instance?_2x\"\n\t\t\t\t\t\t},\n\t\t\t\t\t\t\"Delete_resourses_volume_of_instance?_2x\": {\n\t\t\t\t\t\t\t\"Type\": \"Task\",\n\t\t\t\t\t\t\t\"Resource\": \"${Deleteresourses.Arn}\",\n\t\t\t\t\t\t\t\"Next\": \"Read_from_volume_queue_of_instance_2x\"\n\t\t\t\t\t\t}\n\t\t\t\t\t}\n\n\t\t\t\t}\n                              ]\n                            },\n                          \"TBD_instance\" : {\n                               \"Type\" : \"Pass\",\n                               \"End\" : true\n                            }\n                          }\n                         }\n\t\t\t]\n\t\t},\n\t\t\"Final_state\": {\n\t\t\t\"Type\": \"Task\",\n\t\t\t\"Resource\": \"${Deletequeue.Arn}\",\n\t\t\t\"Next\": \"Read_from_region_queue\"\n\t\t}\n\t}\n}\n"
+             	} ,           
+
+                "RoleArn": {
+                    "Fn::GetAtt": [
+                        "StatesExecutionRole",
+                        "Arn"
+                    ]
+                }
+            }
+        
+        }
+
+     },
+
+
+     "Outputs" : {
+          "KMSRoleName" : {
+               "Description" : "Provide access to this role to use CMK",
+               "Value" : { "Fn::GetAtt": [
+                        "RoleForLambdaInstanceAndKMS",
+                        "Arn"
+                    ] 
+                }
+         },
+          "GroupNameForUsers" : {
+               "Description" : "Add all useres to this group whom you want to restrict to use EBS encryption",
+               "Value" : { "Fn::GetAtt": [
+                        "GroupNotToExecuteEBSEncryption",
+                        "Arn"
+                    ]
+                }
+         }
+     }
+
+}
+
